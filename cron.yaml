@@ -1,0 +1,5 @@
+cron:
+- description: "marketing lead scoring job"
+  schedule: every day 05:00
+  target: marketing_lead_scoring
+  url: /score_leads

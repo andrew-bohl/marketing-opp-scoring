@@ -1,0 +1,46 @@
+# See list of built-in substitutions at
+# https://cloud.google.com/container-builder/docs/configuring-builds/substitute-variable-values
+substitutions:
+  _ENVIRONMENT: dev
+  _GCP_PROJECT: v1-dev-main
+  _GKE_ZONE: us-west1-b
+  _GKE_CLUSTER: volusion-dev
+  _HELM_REPO: infrastructure
+  _HELM_CHART_PATH: kubernetes/helm
+
+# This cloudbuild.yaml contains a git-crypt decryption build step that pulls the git-crypt key from 
+# Google's Cloud KMS.
+#
+# Requires the Container Builder Service Account to have permission to access
+# and decrypt keys from KMS.
+
+### Encrypted using this command:
+# gcloud --project=volusion-dev kms encrypt --plaintext-file=./.git-crypt.key --ciphertext-file=git-crypt.key.enc --location=global --keyring=infrastructure --key=git-crypt
+
+steps:
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: 
+  - kms
+  - decrypt
+  - --ciphertext-file=/helm/git-crypt.key.enc
+  - --plaintext-file=/helm/.git-crypt-key
+  - --location=global
+  - --keyring=infrastructure
+  - --key=git-crypt
+- name: 'gcr.io/cloud-builders/docker'
+  args: ["build", "-t", "gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA", "."]
+- name: 'gcr.io/cloud-builders/gcloud'
+  args: 
+  - docker
+  - --
+  - push
+  - "gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA"
+
+
+images: [
+  'gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA'
+]
+
+tags:
+- ${REPO_NAME}
+- ${_ENVIRONMENT}

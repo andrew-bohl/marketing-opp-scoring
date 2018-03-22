@@ -1,0 +1,16 @@
+steps:
+- name: 'gcr.io/cloud-builders/docker'
+  args: ["build", "-t", "gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA", "."]
+- name: 'gcr.io/cloud-builders/docker'
+  args: ["push", "gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA"]
+- name: 'gcr.io/cloud-builders/gcloud'
+  args:
+  - app
+  - deploy
+  - --project=v1-dev-main
+  - --image-url=gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA
+
+images: [
+  'gcr.io/$PROJECT_ID/$REPO_NAME:$COMMIT_SHA'
+]
+

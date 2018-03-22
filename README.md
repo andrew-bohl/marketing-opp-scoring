@@ -1,2 +1,6 @@
 # marketing_lead_scoring
-Data science model for scoring marketing leads
+
+Production service of the marketing leads scoring model.
+
+--
+

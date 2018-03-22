@@ -1,0 +1,31 @@
+[[source]]
+
+url = "https://pypi.python.org/simple"
+verify_ssl = true
+name = "pypi"
+
+
+[packages]
+
+pandas = "*"
+numpy = "*"
+sklearn = "*"
+raven = {extras = ["flask"]}
+flask = "*"
+flask-script = "*"
+python-nginx = "*"
+requests = "*"
+twisted = "*"
+google-cloud = "*"
+sqlalchemy = "*"
+sqlalchemy-bigquery = "*"
+pycodestyle = "*"
+
+
+[dev-packages]
+
+
+
+[requires]
+
+python_version = "3.6"
