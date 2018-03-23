@@ -5,12 +5,14 @@ import sys
 from flask import Flask, jsonify
 from raven.contrib.flask import Sentry
 
+# from src.api import api
+from src.config import BaseConfig as conf
 
 __all__ = ['create_app']
 
 
 def create_app(config=None, app_name=None):
-	"""Creates the Flask app.
+    """Creates the Flask app.
 
     Creates a instance of the flask application as it sets up
     the configuration, api blueprints, and logging.
@@ -21,13 +23,13 @@ def create_app(config=None, app_name=None):
         flask application instance
     """
     def dump_config():
-	    print(f"\n\nStarting {config.APP_NAME} with config:")
-	    for k,v in vars(conf).items():
-	        if not k.startswith("__"):
-	            print(f"{k}: {v}")
-	    print("\n\n")
+        print(f"\n\nStarting {config.APP_NAME} with config:")
+        for k,v in vars(conf).items():
+            if not k.startswith("__"):
+                print(f"{k}: {v}")
+        print("\n\n")
 
-	dump_config()
+    dump_config()
     app_name = app_name or config.APP_NAME
     app = Flask(app_name)
     _configure_app(app, config)
@@ -38,9 +40,9 @@ def create_app(config=None, app_name=None):
 
 
 def _configure_sentry(app):
-	SENTRY_KEY = os.getenv("DSN_KEY")
-	SENTRY_PROJECT = os.getenv("SENTRY_PROJECT")
-	app.sentry = Sentry(app, dsn=f"https://{SENTRY_KEY}@sentry.io/{SENTRY_PROJECT}")
+    SENTRY_KEY = os.getenv("DSN_KEY")
+    SENTRY_PROJECT = os.getenv("SENTRY_PROJECT")
+    app.sentry = Sentry(app, dsn=f"https://{SENTRY_KEY}@sentry.io/{SENTRY_PROJECT}")
 
 
 def _configure_app(app, config=None):
