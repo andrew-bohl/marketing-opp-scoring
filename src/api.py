@@ -1,6 +1,8 @@
 """API Routing module"""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
+
+# add in the `request` too
 
 api = Blueprint('api', __name__, url_prefix='/lead-scoring')
 
@@ -8,5 +10,4 @@ api = Blueprint('api', __name__, url_prefix='/lead-scoring')
 @api.route('/score-leads', methods=['GET'])
 def score_leads():
     # This will be where Tian's code gets called.
-    request
     return jsonify(status=200)
