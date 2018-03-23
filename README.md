@@ -2,7 +2,7 @@
 
 Production service of the marketing leads scoring model.
 
---
+![Marketing Lead Scoring Components](marketing_lead_scoring_arch.jpg)
 
 # Building
 ```
