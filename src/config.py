@@ -35,4 +35,3 @@ class BaseConfig(object):
     #                'tracker_id': FREE_TRIAL_ACTION_TRACKER_ID},
     #               {'table_name': STORE_CONVERSION_TABLE,
     #                'tracker_id': STORE_ACTION_TRACKER_ID}]
-

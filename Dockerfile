@@ -6,8 +6,6 @@ WORKDIR /app
 
 # Build system dependencies first for layer caching
 COPY Pip* ./
-
-# Install Numpy, Scipy
 RUN echo "http://dl-8.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
 	apk --no-cache --update-cache add gcc gfortran python python-dev py-pip build-base wget freetype-dev libpng-dev openblas-dev && \
 	ln -s /usr/include/locale.h /usr/include/xlocale.h && \
