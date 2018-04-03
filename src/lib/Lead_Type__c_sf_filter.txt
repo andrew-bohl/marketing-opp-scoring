@@ -1,0 +1,2 @@
+testmedium
+curl test

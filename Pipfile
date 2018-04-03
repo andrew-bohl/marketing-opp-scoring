@@ -16,6 +16,7 @@ sqlalchemy_bigquery = "*"
 pycodestyle = "*"
 scikit-learn = {extras = ["alldeps"]}
 simple-salesforce = "*"
+nose = "*"
 
 [dev-packages]
 
