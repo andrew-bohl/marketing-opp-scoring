@@ -5,13 +5,13 @@ import sys
 from flask import Flask, jsonify
 from raven.contrib.flask import Sentry
 
-from src.api import api
+import src.api as api
 from src.config import BaseConfig as conf
 
 __all__ = ['create_app']
 
 
-def create_app(config=None, app_name=None):
+def c:
     """Creates the Flask app.
 
     Creates a instance of the flask application as it sets up

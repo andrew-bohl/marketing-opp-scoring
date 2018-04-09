@@ -22,7 +22,15 @@ class BaseConfig(object):
     GA_SESSIONS = os.getenv("GA_SESSIONS_TABLE", 'ga_customer_paths')
 
     BUCKET_NAME = 'marketing-lead-scoring'
-    GCS_FOLDER = ''
+    GCS_FOLDER = None
+    MODEL_NAME = None
 
+    OUTPUTS_PATH = 'outputs/'
     """ TEST CONFIG E.G CUT OFF DATES FOR TESTING """
     TEST_CUTOFF = dt.datetime(2018, 2, 1)
+
+    """ SALESFORCE CREDENTIALS """
+    SALESFORCE_USERNAME = os.getenv("SALESFORCE_USERNAME")
+    SALESFORCE_PASSWORD = os.getenv("SALESFORCE_PASSWORD")
+    SALESFORCE_TOKEN = os.getenv("SALESFORCE_TOKEN")
+    SALESFORCE_DOMAIN = os.getenv("SALESFORCE_DOMAIN")

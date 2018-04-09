@@ -3,6 +3,7 @@
 class QueryLogic(object):
     SALEFORCE_QUERY = """
     SELECT 
+        salesforce_id,
         trial_order_detail_id, 
         trial_order_id, 
         Lead_Type__c, 
@@ -29,7 +30,7 @@ class QueryLogic(object):
         opp_iswon, 
         opp_CloseDate 
     FROM `v1-dev-main.LeadScoring.v1v2_leads_opps`
-    WHERE lead_createdate >= '2017-01-01'
+    WHERE lead_createdate >= '{}' and lead_createdate <= '{}'
     """
 
     GA_QUERY = """
@@ -63,7 +64,7 @@ class QueryLogic(object):
         Brand_NonBrand, 
         demo_session_position
     FROM `v1-dev-main.LeadScoring.ga_customer_paths`
-    WHERE date >= '2017-01-01'
+    WHERE date >= '{}' and date <= '{}'
     """
 
     TRIAL_CONV_QUERY = """
@@ -74,5 +75,14 @@ class QueryLogic(object):
         sub_date,
         CASE WHEN sub_id IS NOT NULL THEN 1 else -1 END as converted 
     FROM `v1-dev-main.LeadScoring.trial_conversions`
-    WHERE trial_date >= '2017-01-01'
+    WHERE trial_date >= '{}' and trial_date <= '{}'
     """
+
+    IMPORT_SALESFORCE_LEADS = """SELECT ID, 
+                            Created_Date_Time__c, 
+                            order_ID__C, 
+                            company
+                            FROM LEAD 
+                            WHERE 
+                            RecordTypeID IN ('01270000000EAWZAA4', '01270000000Q4tBAAS') 
+                            and CreatedDate = LAST_N_DAYS:{}"""
