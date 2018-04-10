@@ -11,7 +11,7 @@ from src.config import BaseConfig as conf
 __all__ = ['create_app']
 
 
-def c:
+def create_app(config=None, app_name=None):
     """Creates the Flask app.
 
     Creates a instance of the flask application as it sets up
