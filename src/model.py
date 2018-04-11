@@ -103,7 +103,6 @@ def infer(start_date, end_date):
 
 
 def main():
-    pass
 
 
 if __name__ == '__main__':

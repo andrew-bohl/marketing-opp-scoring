@@ -4,7 +4,7 @@ import threading
 
 from flask import Blueprint, jsonify, request
 
-import model
+import src.model as model
 
 api = Blueprint('api', __name__, url_prefix='/lead-scoring')
 

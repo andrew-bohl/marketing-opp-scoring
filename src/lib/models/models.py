@@ -13,7 +13,7 @@ from sklearn.metrics import accuracy_score, auc, confusion_matrix, roc_curve
 from sklearn.naive_bayes import BernoulliNB
 
 from src.lib.bigquery import bigquery as bq
-import src.lib.models.clean_data as clean_data
+from src.lib.models import clean_data
 import src.main as app
 from src.data import queries as query
 
