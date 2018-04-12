@@ -17,6 +17,7 @@ pycodestyle = "*"
 scikit-learn = {extras = ["alldeps"]}
 simple-salesforce = "*"
 nose = "*"
+service-identity = "*"
 
 [dev-packages]
 

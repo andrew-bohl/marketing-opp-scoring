@@ -1,5 +1,6 @@
 """QUERY LOGIC FOR IMPORTING DATA"""
 
+
 class QueryLogic(object):
     SALEFORCE_QUERY = """
     SELECT 

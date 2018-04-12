@@ -100,10 +100,3 @@ def infer(start_date, end_date):
     else:
         log.error("Model is older than 7 days. Please train first")
         raise Exception("Model is older than 7 days")
-
-
-def main():
-
-
-if __name__ == '__main__':
-    main()

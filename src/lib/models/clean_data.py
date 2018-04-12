@@ -6,7 +6,7 @@ import datetime as dt
 import pandas as pd
 import numpy as np
 
-import src.main as app
+from src.config import BaseConfig as config
 from src.data import filters
 import src.lib.models.utilities as utils
 
@@ -56,7 +56,7 @@ def clean_salesforce_data(client, sql):
     salesforce_data = salesforce_data[salesforce_data['lead_createdate'] <= salesforce_data['opp_close_date_impute']]
     date_suffix = dt.datetime.today().date().isoformat()
 
-    output_path = app.config.OUTPUTS_PATH
+    output_path = config.OUTPUTS_PATH
 
     salesforce_data.to_csv(output_path + "salesforce_" + str(date_suffix) + ".csv")
     return salesforce_data
@@ -77,7 +77,7 @@ def clean_ga_data(client, sql):
 
     date_suffix = dt.datetime.today().date().isoformat()
 
-    output_path = app.config.OUTPUTS_PATH
+    output_path = config.OUTPUTS_PATH
 
     ga_paths.to_csv(output_path + "ga_sessions_" + str(date_suffix) + ".csv")
     return ga_paths
@@ -93,7 +93,7 @@ def clean_conversions_data(client, sql):
     trials = utils.convert_cols_to_datetime(trials)
     date_suffix = dt.datetime.today().date().isoformat()
 
-    output_path = app.config.OUTPUTS_PATH
+    output_path = config.OUTPUTS_PATH
 
     trials.to_csv(output_path + "trial_conversions" + str(date_suffix) + ".csv")
     return trials
@@ -135,7 +135,7 @@ def merge_datasets(dataset, startdate, enddate, filter_status=True, ):
 
     final_df = final_df[(final_df['trial_date'] < enddate) & (final_df['trial_date'] >= startdate)]
 
-    output_path = app.config.OUTPUTS_PATH
+    output_path = config.OUTPUTS_PATH
 
     df_name = output_path + 'raw_merged_data_open_'
     if filter_status:
@@ -185,7 +185,7 @@ def create_features(data, feature_names=None):
     id_list = np.array(joined_dummies[id_vars])
 
     date_suffix = dt.datetime.today().date().isoformat()
-    output_path = app.config.OUTPUTS_PATH
+    output_path = config.OUTPUTS_PATH
 
     np.save(output_path+'id_list_'+ str(date_suffix), id_list)
     np.save(output_path+'features_names_'+str(date_suffix), features_names)

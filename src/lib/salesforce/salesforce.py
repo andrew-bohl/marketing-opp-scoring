@@ -54,4 +54,5 @@ class SalesForce(object):
         for lead in scores:
             sf_id = lead
             score = round(scores[lead][0][1]*100, -1)
-            self.sf_client.Lead.update(sf_id, {'LeadScoring_score__c': score})
+            self.sf_client.Lead.update(sf_id, {'LeadScoring_score__c': score},
+                                       headers={"Sforce-Auto-Assign": False})

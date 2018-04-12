@@ -5,7 +5,7 @@ import sys
 from flask import Flask, jsonify
 from raven.contrib.flask import Sentry
 
-import src.api as api
+from src.api import api
 from src.config import BaseConfig as conf
 
 __all__ = ['create_app']
@@ -23,7 +23,7 @@ def create_app(config=None, app_name=None):
         flask application instance
     """
     def dump_config():
-        print(f"\n\nStarting {config.APP_NAME} with config:")
+        print(f"Starting {config.APP_NAME} with config:")
         for k, v in vars(conf).items():
             if not k.startswith("__"):
                 print(f"{k}: {v}")
@@ -32,6 +32,7 @@ def create_app(config=None, app_name=None):
     dump_config()
     app_name = app_name or config.APP_NAME
     app = Flask(app_name)
+
     _configure_app(app, config)
     _configure_sentry(app)  # for catching silent exception logging
     _configure_blueprints(app)
@@ -40,8 +41,10 @@ def create_app(config=None, app_name=None):
 
 
 def _configure_sentry(app):
-    SENTRY_KEY = os.getenv("SENTRY_DSN_KEY")
-    SENTRY_PROJECT = os.getenv("SENTRY_PROJECT")
+    SENTRY_KEY = '04d63f7e28e346388f2329f3a630dfe5:8517d1e1244748c09df8eaf2831b9ba8'
+    SENTRY_PROJECT = '457344'
+    #SENTRY_KEY = os.getenv("SENTRY_DSN_KEY")
+    #SENTRY_PROJECT = os.getenv("SENTRY_PROJECT")
     app.sentry = Sentry(app, dsn=f"https://{SENTRY_KEY}@sentry.io/{SENTRY_PROJECT}")
 
 

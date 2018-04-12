@@ -13,15 +13,15 @@ import src.data.queries as query
 class CleanDataTests(unittest.TestCase):
     """UNIT TESTS MODELS PACKAGE"""
     config = conf.BaseConfig
-    start_date = dt(2018, 2, 1)
-    end_date = dt(2018, 3, 1)
+    start_date = dt(2018, 2, 1).date()
+    end_date = dt(2018, 3, 1).date()
     query_logic = query.QueryLogic
 
     def setUp(self):
         """Set up config variables"""
         salesforce_query = self.query_logic.SALEFORCE_QUERY.format(self.start_date, self.end_date)
         ga_query = self.query_logic.GA_QUERY.format(self.start_date, self.end_date)
-        trial_conversions = self.query_logic.TRIAL_CONV_QUERY(self.start_date, self.end_date)
+        trial_conversions = self.query_logic.TRIAL_CONV_QUERY.format(self.start_date, self.end_date)
         gcp_project_name = self.config.BQ_PROJECT_ID
         dataset_name = self.config.LEADSCORING_DATASET
         salesforce_table = self.config.SALESFORCE_TABLE
@@ -53,7 +53,7 @@ class CleanDataTests(unittest.TestCase):
         ga_data = clean_data.clean_ga_data(bq_client, self.ga_query)
 
         len_of_data = len(ga_data)
-        expected_val = 23958
+        expected_val = 24996
 
         self.assertEqual(expected_val, len_of_data,
                          msg="After cleaning data,\
@@ -63,7 +63,7 @@ class CleanDataTests(unittest.TestCase):
         """tests clean_trial_conversions returns expected dataframe"""
 
         bq_client = bq.BigQueryClient(self.gcp_project, self.dataset, self.table_name)
-        trial_conversions = clean_data.clean_ga_data(bq_client, self.trial_conv)
+        trial_conversions = clean_data.clean_conversions_data(bq_client, self.trial_conv)
 
         len_of_data = len(trial_conversions)
         expected_val = 6246
@@ -76,18 +76,18 @@ class CleanDataTests(unittest.TestCase):
         """tests merge data returns expected dataframe"""
 
         bq_client = bq.BigQueryClient(self.gcp_project, self.dataset, self.table_name)
-        trial_conversions = clean_data.clean_ga_data(bq_client, self.trial_conv)
+        trial_conversions = clean_data.clean_conversions_data(bq_client, self.trial_conv)
         salesforce_data = clean_data.clean_salesforce_data(bq_client, self.salesforce_query)
         ga_data = clean_data.clean_ga_data(bq_client, self.ga_query)
 
         dataset = [salesforce_data, ga_data, trial_conversions]
-        final_data = clean_data.merge_datasets(dataset, start_date, end_date, True)
-        final_data_open = clean_data.merge_datasets(dataset, start_date, end_date, False)
+        final_data = clean_data.merge_datasets(dataset, self.start_date, self.end_date, True)
+        final_data_open = clean_data.merge_datasets(dataset, self.start_date, self.end_date, False)
 
         len_final_data = len(final_data)
         len_final_data_open = len(final_data_open)
 
-        exp_val_data = 4416
+        exp_val_data = 4613
         exp_val_data_open = 4424
 
         self.assertEqual(exp_val_data, len_final_data,
@@ -101,18 +101,18 @@ class CleanDataTests(unittest.TestCase):
     def test_create_features(self):
         """tests create_feature function returns expected number of features and observations"""
         bq_client = bq.BigQueryClient(self.gcp_project, self.dataset, self.table_name)
-        trial_conversions = clean_data.clean_ga_data(bq_client, self.trial_conv)
+        trial_conversions = clean_data.clean_conversions_data(bq_client, self.trial_conv)
         salesforce_data = clean_data.clean_salesforce_data(bq_client, self.salesforce_query)
         ga_data = clean_data.clean_ga_data(bq_client, self.ga_query)
 
         dataset = [salesforce_data, ga_data, trial_conversions]
-        final_data = clean_data.merge_datasets(dataset, start_date, end_date, True)
+        final_data = clean_data.merge_datasets(dataset, self.start_date, self.end_date, True)
         features_names, target_variable, _, _ = clean_data.create_features(final_data)
 
         feature_num = len(features_names)
         obs_count = len(target_variable)
 
-        exp_feat_num = 1510
+        exp_feat_num = 1557
         exp_obs_count = 4614
 
         self.assertEqual(exp_feat_num, feature_num,
