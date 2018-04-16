@@ -1,0 +1,23 @@
+FROM python:alpine3.7
+
+ENV PYTHONPATH=/app
+
+WORKDIR /app
+
+# Build dependencies
+RUN apk add --no-cache --virtual=.buildeps build-base curl g++ gcc gfortran git linux-headers musl-dev openssh-client 
+
+# App System Dependencies
+RUN echo "http://dl-8.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
+	apk --no-cache --update-cache add \
+    freetype-dev \
+    libffi-dev \
+    libpng-dev \
+    openblas-dev \
+    openssl-dev \
+    python3 \
+    python3-dev \
+    py-pip \
+    wget && \
+	ln -s /usr/include/locale.h /usr/include/xlocale.h && \
+	pip3 install --no-cache-dir -U numpy scipy pandas pipenv
