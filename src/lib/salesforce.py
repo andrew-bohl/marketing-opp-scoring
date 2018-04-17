@@ -12,14 +12,14 @@ class SalesForce(object):
     def __init__(self, config, sandbox=True):
         # instantiate simple salesforce
         if sandbox:
-            self.sf_client = Salesforce(username=config.SALESFORCE_USERNAME,
-                                        password=config.SALESFORCE_PASSWORD,
-                                        security_token=config.SALESFORCE_TOKEN,
+            self.sf_client = Salesforce(username=config["SALESFORCE_USERNAME"],
+                                        password=config["SALESFORCE_PASSWORD"],
+                                        security_token=config["SALESFORCE_TOKEN"],
                                         domain='test')
         else:
-            self.sf_client = SalesForce(username=config.SALESFORCE_USERNAME,
-                                        password=config.SALESFORCE_PASSWORD,
-                                        security_token=config.SALESFORCE_TOKEN)
+            self.sf_client = SalesForce(username=config["SALESFORCE_USERNAME"],
+                                        password=config["SALESFORCE_PASSWORD"],
+                                        security_token=config["SALESFORCE_TOKEN"])
         self.records = None
         self.data = None
 

@@ -11,7 +11,7 @@ import os
 
 class BaseConfig(object):
     """Class that contains the base config"""
-    APP_NAME = "app"
+    APP_NAME = "marketing-lead-scoring"
     ENV = os.getenv('ENV', 'dev')
 
     # big query configurations
@@ -20,6 +20,7 @@ class BaseConfig(object):
     SALESFORCE_TABLE = os.getenv("SALESFORCE_TABLE", 'v1v2_leads_opps')
     TRIAL_CONVERSION_TABLE = os.getenv("TRIAL_CONVERSION_TABLE", 'trial_conversions')
     GA_SESSIONS = os.getenv("GA_SESSIONS_TABLE", 'ga_customer_paths')
+    BQ_INSERT_BATCH_SIZE = 500
 
     BUCKET_NAME = 'marketing-lead-scoring'
     GCS_FOLDER = None
@@ -34,3 +35,4 @@ class BaseConfig(object):
     SALESFORCE_PASSWORD = os.getenv("SALESFORCE_PASSWORD")
     SALESFORCE_TOKEN = os.getenv("SALESFORCE_TOKEN")
     SALESFORCE_DOMAIN = os.getenv("SALESFORCE_DOMAIN")
+

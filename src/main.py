@@ -6,7 +6,7 @@ from flask import Flask, jsonify
 from raven.contrib.flask import Sentry
 
 from src.api import api
-from src.config import BaseConfig as conf
+from src.config import BaseConfig
 
 __all__ = ['create_app']
 
@@ -24,7 +24,7 @@ def create_app(config=None, app_name=None):
     """
     def dump_config():
         print(f"Starting {config.APP_NAME} with config:")
-        for k, v in vars(conf).items():
+        for k, v in vars(config).items():
             if not k.startswith("__"):
                 print(f"{k}: {v}")
         print("\n\n")
@@ -41,8 +41,9 @@ def create_app(config=None, app_name=None):
 
 
 def _configure_sentry(app):
-    SENTRY_KEY = '04d63f7e28e346388f2329f3a630dfe5:8517d1e1244748c09df8eaf2831b9ba8'
-    SENTRY_PROJECT = '457344'
+    SENTRY_KEY = app.config["SENTRY_DSN_KEY"]
+    SENTRY_PROJECT = app.config["SENTRY_PROJECT"]
+
     #SENTRY_KEY = os.getenv("SENTRY_DSN_KEY")
     #SENTRY_PROJECT = os.getenv("SENTRY_PROJECT")
     app.sentry = Sentry(app, dsn=f"https://{SENTRY_KEY}@sentry.io/{SENTRY_PROJECT}")
@@ -79,7 +80,7 @@ def _set_stdout_based_logging():
     root.addHandler(ch)
 
 
-app = create_app(config=conf)
+app = create_app(config=BaseConfig)
 
 
 @app.route('/health-check', methods=['GET'])
@@ -96,4 +97,5 @@ def health_check():
 
 
 if __name__ == '__main__':
+    app = create_app(config=BaseConfig)
     app.run()

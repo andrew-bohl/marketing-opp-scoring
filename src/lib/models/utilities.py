@@ -81,8 +81,9 @@ def writeall_gcs_files(gcs_client, bucket_name, filepath='.'):
     :param filepath: local folder path to check for
     """
     bucket = gcs_client.get_bucket(bucket_name)
-    filenames = [f for f in os.listdir(filepath) if os.path.isfile(f)]
+    filenames = [f for f in os.listdir(filepath) if os.path.isfile(filepath + f)]
     for file in filenames:
+        print(file)
         write_gcs_file(bucket, os.path.join(filepath, file), file)
 
 
@@ -100,14 +101,20 @@ def load_gcs_model(bucket, model_name=None, foldername=None):
     else:
         model_names = []
         model_dates = []
+        model_features = []
         for blob in bucket.list_blobs(prefix='model_'):
             model_names.append(blob.name)
             model_dates.append(int(blob.name[6:-4].replace('-', '')))
-        model_name = model_names[np.argmax(model_dates)]
-        download_blob(bucket, model_name, foldername)
+            model_features.append('features_names_' + blob.name[6:-4] +'.npy')
 
+        model_name = model_names[np.argmax(model_dates)]
+        feature_names = model_features[np.argmax(model_dates)]
+        download_blob(bucket, model_name, foldername)
+        download_blob(bucket, feature_names, foldername)
+
+    feature_names = np.load(feature_names)
     model = joblib.load(model_name)
-    return model, model_name
+    return model, model_name, feature_names
 
 
 def standardize_columns(dataframe):

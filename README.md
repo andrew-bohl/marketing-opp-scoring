@@ -13,7 +13,11 @@ make build
 
 # Running
 ```
-env=DEV make run
+# on AppEngine or env with credentials baked in
+ENV=dev make run
+
+# uses your default application credentials to run locally
+ENV=dev make run_local
 ```
 
 # Deploying

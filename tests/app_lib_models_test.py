@@ -6,19 +6,18 @@ import numpy as np
 import os
 import unittest
 
-import src.config as conf
+from src.main import app
 from src.lib.models import models
 
 
 class ModelTests(unittest.TestCase):
     """UNIT TESTS MODELS PACKAGE"""
-    config = conf.BaseConfig
 
     def setUp(self):
         """set up model for testing"""
-        self.model = models.Model()
+        self.model = models.Model(app.config)
 
-        output_path = self.config.OUTPUTS_PATH
+        output_path = self.model.config["OUTPUTS_PATH"]
         if not os.path.exists(output_path):
             os.makedirs(output_path)
 
@@ -42,7 +41,7 @@ class ModelTests(unittest.TestCase):
         self.assertEqual(42700, round(sf_data_sz, -2),
                          msg="Salesforce data size was not as expected. Got {}, expected around 42700".format(sf_data_sz))
         self.assertEqual(134300, round(ga_data_sz, -2),
-                         msg="GA data size was not as expected. Got {}, expected around 13400".format(ga_data_sz))
+                         msg="GA data size was not as expected. Got {}, expected around 134300".format(ga_data_sz))
         self.assertEqual(39500, round(conv_data_sz, -2),
                          msg="Trial conversion data size was not as expected. Got {}, expected around 39500".format(conv_data_sz))
 

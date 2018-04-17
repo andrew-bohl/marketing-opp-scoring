@@ -1,30 +1,32 @@
 """test suite for data cleaning"""
 
 from datetime import datetime as dt
+import os
 import unittest
 
-from src.lib.bigquery import bigquery as bq
+from src.lib import bigquery as bq
 from src.lib.models import clean_data
 
-import src.config as conf
+from src.main import app
 import src.data.queries as query
 
 
 class CleanDataTests(unittest.TestCase):
     """UNIT TESTS MODELS PACKAGE"""
-    config = conf.BaseConfig
     start_date = dt(2018, 2, 1).date()
     end_date = dt(2018, 3, 1).date()
     query_logic = query.QueryLogic
 
     def setUp(self):
         """Set up config variables"""
+        self.config = app.config
+
         salesforce_query = self.query_logic.SALEFORCE_QUERY.format(self.start_date, self.end_date)
         ga_query = self.query_logic.GA_QUERY.format(self.start_date, self.end_date)
         trial_conversions = self.query_logic.TRIAL_CONV_QUERY.format(self.start_date, self.end_date)
-        gcp_project_name = self.config.BQ_PROJECT_ID
-        dataset_name = self.config.LEADSCORING_DATASET
-        salesforce_table = self.config.SALESFORCE_TABLE
+        gcp_project_name = self.config["BQ_PROJECT_ID"]
+        dataset_name = self.config["LEADSCORING_DATASET"]
+        salesforce_table = self.config["SALESFORCE_TABLE"]
 
         self.salesforce_query = salesforce_query
         self.ga_query = ga_query
@@ -32,12 +34,19 @@ class CleanDataTests(unittest.TestCase):
         self.gcp_project = gcp_project_name
         self.dataset = dataset_name
         self.table_name = salesforce_table
+        self.relative_path = os.path.dirname(__file__)
+
+        bq_client = bq.BigQueryClient(self.gcp_project,
+                                      self.dataset,
+                                      self.table_name,
+                                      f'{self.relative_path}/credentials/leadscoring.json')
+
+        self.bq_client = bq_client
 
     def test_clean_salesforce(self):
         """tests clean_salesforce method returns expected dataframe"""
 
-        bq_client = bq.BigQueryClient(self.gcp_project, self.dataset, self.table_name)
-        salesforce_data = clean_data.clean_salesforce_data(bq_client, self.salesforce_query)
+        salesforce_data = clean_data.clean_salesforce_data(self.bq_client, self.salesforce_query)
 
         len_of_data = len(salesforce_data)
         expected_val = 13348
@@ -49,8 +58,8 @@ class CleanDataTests(unittest.TestCase):
     def test_clean_ga(self):
         """tests clean_ga_data method returns expected dataframe"""
 
-        bq_client = bq.BigQueryClient(self.gcp_project, self.dataset, self.table_name)
-        ga_data = clean_data.clean_ga_data(bq_client, self.ga_query)
+
+        ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query)
 
         len_of_data = len(ga_data)
         expected_val = 24996
@@ -62,8 +71,7 @@ class CleanDataTests(unittest.TestCase):
     def test_clean_trial_conversions(self):
         """tests clean_trial_conversions returns expected dataframe"""
 
-        bq_client = bq.BigQueryClient(self.gcp_project, self.dataset, self.table_name)
-        trial_conversions = clean_data.clean_conversions_data(bq_client, self.trial_conv)
+        trial_conversions = clean_data.clean_conversions_data(self.bq_client, self.trial_conv)
 
         len_of_data = len(trial_conversions)
         expected_val = 6246
@@ -75,10 +83,9 @@ class CleanDataTests(unittest.TestCase):
     def test_merge_datasets(self):
         """tests merge data returns expected dataframe"""
 
-        bq_client = bq.BigQueryClient(self.gcp_project, self.dataset, self.table_name)
-        trial_conversions = clean_data.clean_conversions_data(bq_client, self.trial_conv)
-        salesforce_data = clean_data.clean_salesforce_data(bq_client, self.salesforce_query)
-        ga_data = clean_data.clean_ga_data(bq_client, self.ga_query)
+        trial_conversions = clean_data.clean_conversions_data(self.bq_client, self.trial_conv)
+        salesforce_data = clean_data.clean_salesforce_data(self.bq_client, self.salesforce_query)
+        ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query)
 
         dataset = [salesforce_data, ga_data, trial_conversions]
         final_data = clean_data.merge_datasets(dataset, self.start_date, self.end_date, True)
@@ -100,10 +107,10 @@ class CleanDataTests(unittest.TestCase):
 
     def test_create_features(self):
         """tests create_feature function returns expected number of features and observations"""
-        bq_client = bq.BigQueryClient(self.gcp_project, self.dataset, self.table_name)
-        trial_conversions = clean_data.clean_conversions_data(bq_client, self.trial_conv)
-        salesforce_data = clean_data.clean_salesforce_data(bq_client, self.salesforce_query)
-        ga_data = clean_data.clean_ga_data(bq_client, self.ga_query)
+
+        trial_conversions = clean_data.clean_conversions_data(self.bq_client, self.trial_conv)
+        salesforce_data = clean_data.clean_salesforce_data(self.bq_client, self.salesforce_query)
+        ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query)
 
         dataset = [salesforce_data, ga_data, trial_conversions]
         final_data = clean_data.merge_datasets(dataset, self.start_date, self.end_date, True)

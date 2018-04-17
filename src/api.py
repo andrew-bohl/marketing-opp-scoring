@@ -2,9 +2,9 @@
 from datetime import datetime, time, timedelta
 import threading
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, current_app
 
-import src.model as model
+from src import model
 
 api = Blueprint('api', __name__, url_prefix='/lead-scoring')
 
@@ -32,17 +32,18 @@ def score_leads():
     those dates instead.
     """
     midnight = datetime.combine(datetime.today(), time.min)
-    default_start = (midnight - timedelta(days=1)).strftime(DATE_FMT)
-    default_end = midnight.strftime(DATE_FMT)
+    default_start = (midnight - timedelta(days=180)).strftime(DATE_FMT)
+    default_end = (midnight - timedelta(days=30)).strftime(DATE_FMT)
 
     payload = request.get_json() or {}
     start_date = _format_date(payload, "start_date", default_start)
     end_date = _format_date(payload, "end_date", default_end)
+    flask_config = current_app.config
 
     t = threading.Thread(group=None,
                          target=model.infer,
                          name="lead-scoring",
-                         args=(start_date, end_date))
+                         args=(start_date, end_date, flask_config))
     t.start()
     return jsonify(status="Started",)
 
@@ -61,16 +62,17 @@ def train_model():
     those dates instead.
     """
     midnight = datetime.combine(datetime.today(), time.min)
-    default_start = (midnight - timedelta(days=90)).strftime(DATE_FMT)
-    default_end = (midnight - timedelta(days=30)).strftime(DATE_FMT)
+    default_start = (midnight - timedelta(days=1)).strftime(DATE_FMT)
+    default_end = midnight.strftime(DATE_FMT)
 
     payload = request.get_json() or {}
     start_date = _format_date(payload, "start_date", default_start)
     end_date = _format_date(payload, "end_date", default_end)
+    flask_config = current_app.config
 
     t = threading.Thread(group=None,
                          target=model.train,
                          name="retraining-model",
-                         args=(start_date, end_date))
+                         args=(start_date, end_date, flask_config))
     t.start()
     return jsonify(status="Retraining")

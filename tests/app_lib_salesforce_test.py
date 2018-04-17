@@ -1,13 +1,15 @@
 """TEST SUITE FOR SALESFORCE LIBRARY"""
 import unittest
 
-import src.config as conf
-from src.lib.salesforce import salesforce
+from src.main import app
+from src.lib import salesforce
 
 
 class SalesforceTests(unittest.TestCase):
     """UNIT TESTS MODELS PACKAGE"""
-    config = conf.BaseConfig
+    def setUp(self):
+        with app.app_context():
+            self.config = app.config
 
 
 if __name__ == '__main__':

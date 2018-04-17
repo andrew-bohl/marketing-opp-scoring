@@ -18,6 +18,9 @@ build-base:
 run: build 
 	docker run -it -p 8080:8080 $(SERVICE)
 
+run_local: build
+	docker run -it -p 8080:8080 -v "$(HOME)/.config/gcloud":/root/.config/gcloud $(SERVICE)
+
 deploy:
 	gcloud app deploy app.$(ENV).yaml cron.yaml --project=v1-$(ENV)-main --version=$(shell date +%Y%m%d-%H%M)
 

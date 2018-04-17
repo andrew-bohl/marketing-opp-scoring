@@ -4,6 +4,7 @@
 
 import datetime as dt
 import logging as log
+import os
 import pickle
 
 import numpy as np
@@ -12,8 +13,7 @@ from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.metrics import accuracy_score, auc, confusion_matrix, roc_curve
 from sklearn.naive_bayes import BernoulliNB
 
-from src.config import BaseConfig as config
-from src.lib.bigquery import bigquery as bq
+from src.lib import bigquery as bq
 from src.lib.models import clean_data
 from src.data import queries as query
 
@@ -22,7 +22,7 @@ class Model(object):
     """Model object class:"""
     today = dt.datetime.today().date().isoformat()
 
-    def __init__(self):
+    def __init__(self, config):
         """instantiates model class object"""
         self.model = None
         self.features = None
@@ -41,23 +41,46 @@ class Model(object):
         ga_query = query_logic.GA_QUERY.format(start_date, end_date)
         conversion_query = query_logic.TRIAL_CONV_QUERY.format(start_date, end_date)
 
-        gcp_project_name = config.BQ_PROJECT_ID
-        dataset_name = config.LEADSCORING_DATASET
-        salesforce_table = config.SALESFORCE_TABLE
+        gcp_project_name = self.config["BQ_PROJECT_ID"]
+        dataset_name = self.config["LEADSCORING_DATASET"]
+        salesforce_table = self.config["SALESFORCE_TABLE"]
 
-        bq_client = bq.BigQueryClient(gcp_project_name, dataset_name, salesforce_table)
+        relative_path = os.path.dirname(__file__)
 
-        salesforce_data = clean_data.clean_salesforce_data(bq_client, salesforce_query)
-        ga_paths = clean_data.clean_ga_data(bq_client, ga_query)
-        trial_conversions = clean_data.clean_conversions_data(bq_client, conversion_query)
+        bq_client = bq.BigQueryClient(gcp_project_name, dataset_name, salesforce_table,
+                                      relative_path + '/credentials/leadscoring.json')
+
+        salesforce_data = clean_data.clean_salesforce_data(
+            bq_client, 
+            salesforce_query, 
+            self.config["OUTPUTS_PATH"]
+        )
+        ga_paths = clean_data.clean_ga_data(
+            bq_client, 
+            ga_query, 
+            self.config["OUTPUTS_PATH"]
+        )
+        trial_conversions = clean_data.clean_conversions_data(
+            bq_client,
+            conversion_query,
+            self.config["OUTPUTS_PATH"]
+        )
 
         return salesforce_data, ga_paths, trial_conversions
 
     def create_model_data(self, datasets, startdate, enddate):
         """Creates dataset for model training"""
 
-        raw_data = clean_data.merge_datasets(datasets, startdate, enddate)
-        features_names, target_variable, features_set, _ = clean_data.create_features(raw_data)
+        raw_data = clean_data.merge_datasets(
+            datasets,
+            startdate, 
+            enddate,
+            self.config["OUTPUTS_PATH"],
+        )
+        features_names, target_variable, features_set, _ = clean_data.create_features(
+            raw_data,
+            self.config["OUTPUTS_PATH"]
+        )
         self.features = features_set
         self.target = target_variable
         self.feat_names = features_names
@@ -65,8 +88,17 @@ class Model(object):
 
     def create_score_set(self, datasets, startdate, enddate):
         """Creates dataset for scoring"""
-        score_set = clean_data.merge_datasets(datasets, startdate, enddate, False)
-        _, _, features_set, id_list = clean_data.create_features(score_set, self.feat_names)
+        score_set = clean_data.merge_datasets(
+            datasets, 
+            startdate, 
+            enddate, 
+            self.config["OUTPUTS_PATH"],
+            filter_status=False)
+        _, _, features_set, id_list = clean_data.create_features(
+            score_set, 
+            self.config["OUTPUTS_PATH"],
+            self.feat_names
+        )
 
         data_dict = {}
         #id_list is pair of ids: 'trial_order_id', 'salesforce_id'
@@ -96,7 +128,7 @@ class Model(object):
         new_y = y_train[new_index]
         new_x = X_train[new_index]
 
-        output_path = config.OUTPUTS_PATH
+        output_path = self.config["OUTPUTS_PATH"]
 
         np.save(output_path + 'test_X', X_test)
         np.save(output_path + 'test_Y', y_test)
@@ -114,7 +146,7 @@ class Model(object):
         clf = BernoulliNB()
         clf.fit(x_train, y_train)
         self.model = clf
-        output_path = config.OUTPUTS_PATH
+        output_path = self.config["OUTPUTS_PATH"]
 
         joblib.dump(clf, output_path + 'model_' + str(self.today) + '.pkl')
 
@@ -157,7 +189,7 @@ class Model(object):
         test_fpr, test_tpr, _ = roc_curve(y_test, y_test_score[:, 1])
         self.evaluation_metrics['test_AUC'] = auc(test_fpr, test_tpr)
 
-        output_path = config.OUTPUTS_PATH
+        output_path = self.config["OUTPUTS_PATH"]
         with open(output_path + 'evaluation_metrics_' + str(self.today) + '.pickle', 'wb') as handle:
             pickle.dump(self.evaluation_metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
