@@ -11,7 +11,7 @@ import numpy as np
 from sklearn.externals import joblib
 from sklearn.model_selection import cross_val_score, train_test_split
 from sklearn.metrics import accuracy_score, auc, confusion_matrix, roc_curve
-from sklearn.naive_bayes import BernoulliNB
+from sklearn.svm import SVC
 
 from src.lib import bigquery as bq
 from src.lib.models import clean_data
@@ -39,7 +39,6 @@ class Model(object):
         query_logic = query.QueryLogic
         salesforce_query = query_logic.SALEFORCE_QUERY.format(start_date, end_date)
         ga_query = query_logic.GA_QUERY.format(start_date, end_date)
-        conversion_query = query_logic.TRIAL_CONV_QUERY.format(start_date, end_date)
 
         gcp_project_name = self.config["BQ_PROJECT_ID"]
         dataset_name = self.config["LEADSCORING_DATASET"]
@@ -60,13 +59,8 @@ class Model(object):
             ga_query, 
             self.config["OUTPUTS_PATH"]
         )
-        trial_conversions = clean_data.clean_conversions_data(
-            bq_client,
-            conversion_query,
-            self.config["OUTPUTS_PATH"]
-        )
 
-        return salesforce_data, ga_paths, trial_conversions
+        return salesforce_data, ga_paths
 
     def create_model_data(self, datasets, startdate, enddate):
         """Creates dataset for model training"""
@@ -81,7 +75,14 @@ class Model(object):
             raw_data,
             self.config["OUTPUTS_PATH"]
         )
-        self.features = features_set
+        pca_X = clean_data.pca_transform(
+            features_set,
+            features_names,
+            50,
+            self.config["OUTPUTS_PATH"]
+        )
+
+        self.features = pca_X
         self.target = target_variable
         self.feat_names = features_names
         log.info("Model uses %d features" % (len(features_names)))
@@ -92,63 +93,53 @@ class Model(object):
             datasets, 
             startdate, 
             enddate, 
-            self.config["OUTPUTS_PATH"],
-            filter_status=False)
+            self.config["OUTPUTS_PATH"]
+        )
         _, _, features_set, id_list = clean_data.create_features(
             score_set, 
             self.config["OUTPUTS_PATH"],
             self.feat_names
         )
-
+        pca_X = clean_data.pca_transform(
+            features_set,
+            features_names,
+            50,
+            self.config["OUTPUTS_PATH"]
+        )
         data_dict = {}
         #id_list is pair of ids: 'trial_order_id', 'salesforce_id'
-        for id_pair, feat in zip(id_list, features_set):
+        for id_pair, feat in zip(id_list, pca_X):
             temp_dict = dict()
             temp_dict['sf_id'] = id_pair[1]
             temp_dict['values'] = feat
             data_dict[id_pair[0]] = temp_dict
         self.to_score = data_dict
 
-    def split_dataset(self, features, target, test_size=0.4, rd_state=4):
+    def split_dataset(self, features, target, test_size=0.4, rd_state=8):
         """Split training data into train and test sets"""
         X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=test_size, random_state=rd_state)
-
-        shuffle_index = np.random.choice(len(X_train), len(X_train))[:]
-        y_train = y_train[shuffle_index]
-        X_train = X_train[shuffle_index]
-
-        converted_index = np.where(y_train[:] == 1)
-        samples_to_balance = len(converted_index[0])*2
-        unconverted_index = np.where(y_train[:] == -1)
-        np.random.shuffle(unconverted_index)
-
-        new_index = np.concatenate((unconverted_index[0][:samples_to_balance], converted_index[0]))
-        np.random.shuffle(new_index)
-
-        new_y = y_train[new_index]
-        new_x = X_train[new_index]
 
         output_path = self.config["OUTPUTS_PATH"]
 
         np.save(output_path + 'test_X', X_test)
         np.save(output_path + 'test_Y', y_test)
-        np.save(output_path + 'train_X', new_x)
-        np.save(output_path + 'train_Y', new_y)
+        np.save(output_path + 'train_X', X_train)
+        np.save(output_path + 'train_Y', y_train)
 
         self.test_set = [y_test, X_test]
-        self.train_set = [new_y, new_x]
+        self.train_set = [y_train, X_train]
 
     def train_model(self, train_set):
         """Train model for prediction task"""
         y_train = train_set[0]
         x_train = train_set[1]
 
-        clf = BernoulliNB()
+        clf = SVC(probability=True)
         clf.fit(x_train, y_train)
         self.model = clf
         output_path = self.config["OUTPUTS_PATH"]
 
-        joblib.dump(clf, output_path + 'model_' + str(self.today) + '.pkl')
+        joblib.dump(clf, output_path + 'opps_model_' + str(self.today) + '.pkl')
 
     def evaluate_model(self, test_set, train_set):
         """Generate model evaluation metrics"""
@@ -190,7 +181,7 @@ class Model(object):
         self.evaluation_metrics['test_AUC'] = auc(test_fpr, test_tpr)
 
         output_path = self.config["OUTPUTS_PATH"]
-        with open(output_path + 'evaluation_metrics_' + str(self.today) + '.pickle', 'wb') as handle:
+        with open(output_path + 'evaluation_metrics_opps_' + str(self.today) + '.pickle', 'wb') as handle:
             pickle.dump(self.evaluation_metrics, handle, protocol=pickle.HIGHEST_PROTOCOL)
 
         log.info(self.evaluation_metrics)

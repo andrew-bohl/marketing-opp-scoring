@@ -1,6 +1,6 @@
 runtime: custom
 env: flex
-service: marketing_lead_scoring
+service: marketing_opp_scoring
 
 env_variables:
   ENV: prod

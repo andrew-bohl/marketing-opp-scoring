@@ -6,7 +6,7 @@ from flask import Blueprint, jsonify, request, current_app
 
 from src import model
 
-api = Blueprint('api', __name__, url_prefix='/lead-scoring')
+api = Blueprint('api', __name__, url_prefix='/opp-scoring')
 
 DATE_FMT = "%Y-%m-%d"
 
@@ -42,7 +42,7 @@ def score_leads():
 
     t = threading.Thread(group=None,
                          target=model.infer,
-                         name="lead-scoring",
+                         name="opp-scoring",
                          args=(start_date, end_date, flask_config))
     t.start()
     return jsonify(status="Started",)

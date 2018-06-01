@@ -31,8 +31,8 @@ def train(start_date, end_date, flask_config):
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    salesforce_data, ga_paths, conversions = current_model.load_data(start_date.date(), end_date.date())
-    datasets = [salesforce_data, ga_paths, conversions]
+    salesforce_data, ga_paths = current_model.load_data(start_date.date(), end_date.date())
+    datasets = [salesforce_data, ga_paths]
     current_model.create_model_data(datasets, start_date.date(), end_date.date())
     target = current_model.target
     features = current_model.features

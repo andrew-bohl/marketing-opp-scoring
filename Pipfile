@@ -18,6 +18,10 @@ scikit-learn = {extras = ["alldeps"]}
 simple-salesforce = "*"
 nose = "*"
 service-identity = "*"
+pytest = "*"
+pytest-cov = "*"
+mock = "*"
+pandas = "*"
 
 [dev-packages]
 
