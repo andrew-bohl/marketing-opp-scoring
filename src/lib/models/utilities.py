@@ -102,10 +102,10 @@ def load_gcs_model(bucket, model_name=None, foldername=None):
         model_names = []
         model_dates = []
         model_features = []
-        for blob in bucket.list_blobs(prefix='model_'):
+        for blob in bucket.list_blobs(prefix='opps_model_'):
             model_names.append(blob.name)
-            model_dates.append(int(blob.name[6:-4].replace('-', '')))
-            model_features.append('features_names_' + blob.name[6:-4] +'.npy')
+            model_dates.append(int(blob.name[11:-4].replace('-', '')))
+            model_features.append('opp_features_names_' + blob.name[11:-4] +'.npy')
 
         model_name = model_names[np.argmax(model_dates)]
         feature_names = model_features[np.argmax(model_dates)]
@@ -115,6 +115,34 @@ def load_gcs_model(bucket, model_name=None, foldername=None):
     feature_names = np.load(feature_names)
     model = joblib.load(model_name)
     return model, model_name, feature_names
+
+def load_gcs_scores(bucket, score_file=None, foldername=None):
+    """ Loads datafiles for data creation and returns a pandas dataframe
+
+    :param bucket: gcs bucket
+    :param score_file: name of scores file
+    :param foldername; folder location of file
+    :return: dataframe
+    """
+    if score_file:
+        download_blob(bucket, score_file, foldername)
+    # return the latest model
+    else:
+        file_names = []
+        file_dates = []
+        for blob in bucket.list_blobs(prefix='sf_ids'):
+            file_names.append(blob.name)
+            file_dates.append(int(blob.name[6:-4].replace('-', '')))
+
+        try:
+            file_name = file_names[np.argmax(file_dates)]
+            download_blob(bucket, file_name, foldername)
+        except ValueError:
+            return None
+
+    scores = pd.read_csv(file_name)
+    scores.set_index("Unnamed: 0").to_dict(orient='index')
+    return scores
 
 
 def standardize_columns(dataframe):
@@ -146,5 +174,4 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 

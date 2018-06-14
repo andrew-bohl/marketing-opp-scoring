@@ -16,7 +16,6 @@ from src.lib import salesforce
 
 
 from datetime import datetime, time, timedelta
-from src.main import app
 
 def train(start_date, end_date, flask_config):
     """ Trains the model over the given date range
@@ -31,7 +30,7 @@ def train(start_date, end_date, flask_config):
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    salesforce_data, ga_paths = current_model.load_data(start_date.date(), end_date.date())
+    salesforce_data, ga_paths = current_model.load_data(start_date, end_date)
     datasets = [salesforce_data, ga_paths]
     current_model.create_model_data(datasets, start_date.date(), end_date.date())
     target = current_model.target
@@ -71,7 +70,7 @@ def infer(start_date, end_date, flask_config):
 
     bucket = util.initialize_gcs(gcs, config["BUCKET_NAME"])
     model, model_name, feature_names = util.load_gcs_model(bucket, config["MODEL_NAME"], config["GCS_FOLDER"])
-    year, month, date = int(model_name[6:10]), int(model_name[11:13]), int(model_name[14:16])
+    year, month, date = int(model_name[11:15]), int(model_name[16:18]), int(model_name[19:21])
     model_date = dt(year, month, date)
 
     if (dt.today() - model_date) <= timedelta(days=7):
@@ -79,12 +78,15 @@ def infer(start_date, end_date, flask_config):
         current_model.model = model
         current_model.feat_names = feature_names
 
-        salesforce_data, ga_paths, conversions = current_model.load_data(start_date, end_date)
-        dataset = [salesforce_data, ga_paths, conversions]
+        salesforce_data, ga_paths = current_model.load_data(start_date, end_date)
+        dataset = [salesforce_data, ga_paths]
         current_model.create_score_set(dataset, start_date, end_date)
 
         errors = []
         scores = {}
+
+        old_scores = util.load_gcs_scores(bucket)
+
         for lead_id in current_model.to_score.keys():
             try:
                 lead = current_model.to_score[lead_id]
@@ -96,13 +98,12 @@ def infer(start_date, end_date, flask_config):
                 errors.append(lead_id)
 
         output_path = config["OUTPUTS_PATH"]
-        pd.DataFrame(errors).to_csv(output_path+'missing_trial_ids' + str(current_model.today)+'.csv')
-        print(scores)
+        if len(errors) > 0:
+            pd.DataFrame(errors).to_csv(output_path+'missing_trial_ids' + str(current_model.today)+'.csv')
+        pd.DataFrame.from_dict(scores, orient='index').to_csv(output_path+'sf_ids'+str(current_model.today)+'.csv')
 
-        #pd.DataFrame.from_dict(scores, orient='index').to_csv(output_path+'sf_ids'+str(current_model.today)+'.csv')
-
-        sf_client = salesforce.Salesforce(flask_config, sandbox=True)
-        sf_client.write_lead_scores(scores)
+        sf_client = salesforce.salesforce_api(config, sandbox=False)
+        sf_client.write_lead_scores(scores, old_scores)
 
         bucket_name = config["BUCKET_NAME"]
 
@@ -110,8 +111,11 @@ def infer(start_date, end_date, flask_config):
 
     else:
         log.error("Model is older than 7 days. Please train first")
-        raise Exception("Model is older than 7 days")
-
-
+        log.info("Model is older than 7 days.. Retraining")
+        midnight = dt.combine(dt.today(), time.min)
+        start_date = midnight - timedelta(days=180)
+        end_date = midnight - timedelta(days=30)
+        train(start_date, end_date, flask_config)
+        infer(start_date, end_date, flask_config)
 
 

@@ -5,8 +5,7 @@ import datetime as dt
 import logging as log
 
 import numpy as np
-import math
-from sklearn.decomposition import PCA
+from sklearn.decomposition import IncrementalPCA
 import pandas as pd
 import urllib.parse as url
 
@@ -25,17 +24,6 @@ def clean_salesforce_data(client, sql, output_path):
         dataframe = dataframe[dataframe['to_keep'] == 1]
         return dataframe
 
-    def parse_industries(dataframe):
-        i_list = []
-        for x in dataframe['industry__c'].unique():
-            try:
-                math.isnan(x)
-            except TypeError:
-                for ind in x.split(" / "):
-                    i_list.append(ind)
-                i_list = list(set(i_list))
-        return industry_list
-
     salesforce_data = utils.load_bigquery_data(client, sql)
 
     # runs this one first because filters are case sensitive
@@ -46,38 +34,39 @@ def clean_salesforce_data(client, sql, output_path):
     #filters out ids not of len 7
 
     salesforce_data = filter_bad_orderids(salesforce_data, 'trial_order_id', 7)
-
-    industry_list = parse_industries(salesforce_data)
-    for ind in industries:
-        salesforce_data[ind] = 0
-        salesforce_data.loc[(salesforce_data["industry__c"].notnull()) & (salesforce_data["industry__c"].str.contains(ind)), ind] = 1
-
     salesforce_data = salesforce_data.sort_values(['trial_order_id', 'lead_createdate'], ascending=False)\
         .groupby('trial_order_id').first().reset_index()
 
     salesforce_data = utils.convert_cols_to_datetime(salesforce_data)
-    salesforce_data['converted_to_opp'] = salesforce_data['converted_to_opp'].apply(lambda x: 1 if x == 'true' else 0)
-    salesforce_data['created_date_dt'] = salesforce_data['lead_createdate'].apply(lambda x: x.date())
-
-    def impute_lead_close_date(createdate):
-        """calculated a close date"""
-        if createdate:
-            newdate = createdate + dt.timedelta(days=8)
-            return newdate
-        else:
-            return createdate
-
-    salesforce_data['lead_close_date_impute'] = salesforce_data['created_date_dt'].apply(impute_opp_close_date)
-    salesforce_data['lead_close_date_impute'] = pd.to_datetime(salesforce_data['lead_close_date_impute'])
-    salesforce_data['lead_close_date_impute'] = salesforce_data['opp_createdate'].\
-        combine_first(salesforce_data['lead_close_date_impute'])
-
-    salesforce_data = salesforce_data[salesforce_data['lead_createdate'] <= salesforce_data['lead_close_date_impute']]
 
     #create hour of day feature
     salesforce_data["hour_of_day"] = salesforce_data["lead_createdate"].apply(lambda x: x.hour)
 
-    date_suffix = dt.datetime.today().date().isoformat()
+    print(salesforce_data['converted_to_opp'].sum())
+    print("Number of converted in sample")
+
+    salesforce_data['created_date_dt'] = salesforce_data['lead_createdate'].apply(lambda x: x.date())
+
+    def impute_opp_close_date(createdate):
+        """calculated a close date"""
+        if createdate:
+            newdate = createdate + dt.timedelta(days=14)
+            return newdate
+        else:
+            return createdate
+
+    salesforce_data['lead_close_date_impute'] = salesforce_data['lead_createdate'].apply(impute_opp_close_date)
+    salesforce_data['lead_close_date_impute'] = pd.to_datetime(salesforce_data['lead_close_date_impute'])
+    salesforce_data['lead_close_date_impute'] = salesforce_data['opp_createdate'].\
+        combine_first(salesforce_data['lead_close_date_impute'])
+
+    salesforce_data['lead_close_date_impute'] = salesforce_data['lead_close_date_impute'].apply(lambda x: x.date())
+    salesforce_data['lead_createdate'] = pd.to_datetime(salesforce_data['lead_createdate'])
+    salesforce_data['lead_createdate'] = salesforce_data['lead_createdate'].apply(lambda x: x.date())
+
+    salesforce_data = salesforce_data[salesforce_data['lead_createdate'] <= salesforce_data['lead_close_date_impute']]
+
+    date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
 
     salesforce_data.to_csv(output_path + "salesforce_" + str(date_suffix) + ".csv")
     return salesforce_data
@@ -88,7 +77,6 @@ def clean_ga_data(client, sql, output_path):
 
     :return: dataframe
     """
-
     def landing_page_classification(a_path):
         if a_path.find('/blog') >= 0:
             return 'blog'
@@ -122,12 +110,12 @@ def clean_ga_data(client, sql, output_path):
 
     ga_paths['campaign'] = ga_paths['campaign'].fillna('')
     ga_paths['non_brand'] = ga_paths['campaign'].apply(lambda x: 1 if x.find('-nbr-') else 0)
-    ga_paths['landingpage_class'] = ga_paths['landingPagePath'].apply(landing_page_classification)
+    ga_paths['landingpage_class'] = ga_paths['landingpagepath'].apply(landing_page_classification)
     ga_paths["landingpage_class"] = ga_paths["landingpage_class"].astype("category")
 
     ga_paths = ga_paths.join(pd.get_dummies(ga_paths["landingpage_class"]), how='left', rsuffix='_lp_ct')
 
-    date_suffix = dt.datetime.today().date().isoformat()
+    date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
 
     ga_paths.to_csv(output_path + "ga_sessions_" + str(date_suffix) + ".csv")
     return ga_paths
@@ -145,9 +133,9 @@ def merge_datasets(dataset, startdate, enddate, output_path):
     salesforce_df, ga_df = dataset[0], dataset[1]
 
     #merge sf and ga data
-    paths_sf = ga_df.set_index('demo_lookup').join(salesforce_df.set_index("trial_order_detail_id"), lsuffix='_ga', how='inner')
-    paths_sf['date'] = pd.to_datetime(paths_sf['date'])
-    paths_sf = paths_sf[paths_sf['lead_close_date_impute'] >= paths_sf['date']]
+    paths_sf = salesforce_df.set_index("trial_order_detail_id").join(ga_df.set_index('demo_lookup'), rsuffix='_ga', how='left')
+    paths_sf['date'] = paths_sf['date'].apply(lambda x: x.date())
+    paths_sf = paths_sf[(paths_sf['date'] <= paths_sf['lead_close_date_impute']) | (paths_sf['date'].isnull())]
 
     session_counts = paths_sf.reset_index().groupby('index').count()['session_id']
     landingpage_counts = paths_sf.reset_index().groupby('index').sum()[['non_brand', u'admin',
@@ -159,21 +147,18 @@ def merge_datasets(dataset, startdate, enddate, output_path):
     marketing_sources = ga_df[ga_df['first_demo_session'].notnull()]
 
     #master dataframe
-    data_merged = marketing_sources.set_index('demo_lookup').join(merged, how='inner', lsuffix='_ms')
+    data_merged = salesforce_df.set_index("trial_order_detail_id").join(marketing_sources.set_index('demo_lookup'), how='left', rsuffix='_ms')
+
     data_merged = data_merged.join(session_counts, how='left', rsuffix='_count')
     data_merged = data_merged.join(landingpage_counts, how='left', rsuffix='_page_counts')
-    data_merged['session_id_count'] = data_merged ['session_id_count'].fillna(0)
-    data_merged['session_count'] = data_merged ['session_id_count']
+    data_merged['session_id_count'] = data_merged['session_id_count'].fillna(0)
+    data_merged['session_count'] = data_merged['session_id_count']
 
-    blog_sessions = ga_df[ga_df['landingPagePath'].str.contains("blog")].groupby('demo_lookup').count()['session_id']
+    blog_sessions = ga_df[ga_df['landingpagepath'].str.contains("blog")].groupby('demo_lookup').count()['session_id']
     data_merged = data_merged.join(blog_sessions, how='left', rsuffix='_blog')
     data_merged['blog_sessions'] = data_merged['session_id_blog']
-
-    df_name = output_path + 'raw_opp_data_'
-
-    data_merged.to_pickle(df_name + str(startdate) + '_' + str(enddate))
-
     return data_merged
+
 
 
 def pca_transform(features, feature_names, ncomponents=50, output_path=''):
@@ -183,17 +168,22 @@ def pca_transform(features, feature_names, ncomponents=50, output_path=''):
     :param feature_names: feature names to transform
     :param ncomponents: number of principal components
     """
-    pca = PCA(n_components=ncomponents)
+
+    #print(feature_names.shape)
+    #print(features.shape)
+
+    pca = IncrementalPCA(n_components=ncomponents, batch_size=50)
     pca.fit(features)
     log.info('{} variance explained by {} components.'.format(pca.explained_variance_ratio_.sum(), ncomponents))
 
-    i = np.identity(X.shape[1])
+    i = np.identity(features.shape[1])
     coef = pca.transform(i)
 
-    feat_weights = pd.DataFrame(coef, columns=range(1, coef.shape[1]+1), index=feature_names).sort_values(1, ascending=False)
-    feat_weights.to_csv(output_path+"pca_feat_weights_" + str(startdate) + '_' + str(enddate)+".csv", sep=",")
+    date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
 
-    date_suffix = dt.datetime.today().date().isoformat()
+    feat_weights = pd.DataFrame(coef, columns=range(1, coef.shape[1]+1), index=feature_names[3:]).sort_values(1, ascending=False)
+    feat_weights.to_csv(output_path+"pca_feat_weights_" + str(date_suffix) +".csv", sep=",")
+
     pca_X = pca.transform(features)
     np.save(output_path+'opp_PCA_X'+str(date_suffix), pca_X)
     return pca_X
@@ -208,26 +198,36 @@ def create_features(data, output_path, feature_names=None):
     t = ['True', 'Yes']
     data['have_products'] = data['have_products__c'].isin(t).apply(lambda x: 1 if x else 0)
 
-    data['lead_day_of_week'] = data['lead_createdate'].apply(lambda x: x.date().weekday())
+    data['lead_day_of_week'] = data['lead_createdate'].apply(lambda x: x.weekday())
 
-    transformed_vars = ['converted_to_opp', 'blog_sessions', 'affiliate_touch',
-                        'have_products', 'session_count', 'non_brand_page_counts',
-                        u'admin_page_counts', 'affiliate_page_counts', u'blog_page_counts',
-                        u'brand_page_counts', u'competitor_page_counts', u'display_page_counts',
-                        u'guides_page_counts', u'sem_page_counts', u'site_page_counts', 'Jewelry',
-                        'Entertainment', 'Unknown', 'Food & Drink', 'Other', 'Electronics',
-                        'Automotive', 'Clothing & Accessories', 'Services', 'Kitchen', 'Lifestyle',
-                        'Pet Supplies', 'Health & Beauty', 'Craft & Hobby', 'Games', 'Sporting Goods',
-                        'Apparel', 'Toys & Collectibles', 'Kids & Baby', 'Art', 'Weddings', 'Home Decor',
-                        'Sports & Outdoors']
+    def parse_industries(dataframe):
+        i_list = []
+        for x in dataframe['industry__c'].unique():
+            if x:
+                for ind in x.split(" / "):
+                    i_list.append(ind)
+                i_list = list(set(i_list))
+        return i_list
+
+    industry_list = parse_industries(data)
+    for ind in industry_list:
+        data[ind] = 0
+        data.loc[(data["industry__c"].notnull()) & (data["industry__c"].str.contains(ind)), ind] = 1
+
+    transformed_vars = ['converted_to_opp', 'blog_sessions', 'affiliate_touch', 'have_products', 'session_count',
+                        'non_brand_page_counts', u'admin_page_counts', 'affiliate_page_counts', u'blog_page_counts',
+                        u'brand_page_counts', u'competitor_page_counts', u'display_page_counts', u'guides_page_counts',
+                        u'sem_page_counts', u'site_page_counts']
+
+    transformed_vars.extend(industry_list)
 
     id_vars = ['trial_order_id', 'salesforce_id']
 
     # get dummy variables
-    cat_variables = ['u_version', 'landingpage_class', 'devicecategory', 'addistributionnetwork', 'medium',
-                     u'socialnetwork', u'adkeywordmatchtype', u'country_ms', u'lead_type__c', u'leadsource',
-                     'device_type__c', u'number_of_products_selling__c', u'sms_opt_in__c', 'timezone__c',
-                     u'socialsignup__c', 'gender__c', 'have_products__c', 'position__c', 'lead_day_of_week',
+    cat_variables = ['u_version', 'landingpage_class', 'devicecategory', 'medium',
+                     u'socialnetwork', u'country_ms', u'lead_type__c', u'leadsource',
+                     'device_type__c', u'number_of_products_selling__c', u'sms_opt_in__c',
+                     'socialsignup__c', 'gender__c', 'have_products__c', 'position__c', 'lead_day_of_week',
                      u'hour_of_day']
 
     for x in cat_variables:
@@ -243,6 +243,10 @@ def create_features(data, output_path, feature_names=None):
     for x in fill:
         data[x] = data[x].fillna(0)
 
+    for t_var in transformed_vars:
+        if t_var not in data.columns:
+            data[t_var] = 0
+
     dummies = pd.get_dummies(data[cat_variables])
     joined_dummies = data[id_vars + transformed_vars].join(dummies)
 
@@ -255,11 +259,11 @@ def create_features(data, output_path, feature_names=None):
         pass
 
     features_names = joined_dummies.columns
-    features_set = np.array(joined_dummies[joined_dummies.columns[3:]])
-    target_variable = np.array(joined_dummies['converted_to_opp'])
-    id_list = np.array(joined_dummies[id_vars])
+    features_set = joined_dummies[joined_dummies.columns[3:]].values
+    target_variable = joined_dummies['converted_to_opp'].values
+    id_list = joined_dummies[id_vars].values
 
-    date_suffix = dt.datetime.today().date().isoformat()
+    date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
 
     np.save(output_path+'id_list_'+ str(date_suffix), id_list)
     np.save(output_path+'opp_features_names_'+str(date_suffix), features_names)
@@ -267,5 +271,3 @@ def create_features(data, output_path, feature_names=None):
     np.save(output_path+'opp_target_Y_'+str(date_suffix), target_variable)
 
     return features_names, target_variable, features_set, id_list
-
-

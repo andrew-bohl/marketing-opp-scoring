@@ -41,12 +41,13 @@ def create_app(config=None, app_name=None):
 
 
 def _configure_sentry(app):
-    SENTRY_KEY = app.config["SENTRY_DSN_KEY"]
-    SENTRY_PROJECT = app.config["SENTRY_PROJECT"]
-
-    #SENTRY_KEY = os.getenv("SENTRY_DSN_KEY")
-    #SENTRY_PROJECT = os.getenv("SENTRY_PROJECT")
+    SENTRY_KEY = '04d63f7e28e346388f2329f3a630dfe5:8517d1e1244748c09df8eaf2831b9ba8'
+    SENTRY_PROJECT = '457344'
     app.sentry = Sentry(app, dsn=f"https://{SENTRY_KEY}@sentry.io/{SENTRY_PROJECT}")
+
+    # SENTRY_KEY = os.getenv("SENTRY_DSN_KEY")
+    # SENTRY_PROJECT = os.getenv("SENTRY_PROJECT")
+    # app.sentry = Sentry(app, dsn=f"https://{SENTRY_KEY}@sentry.io/{SENTRY_PROJECT}")
 
 
 def _configure_app(app, config=None):

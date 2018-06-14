@@ -20,7 +20,6 @@ from src.data import queries as query
 
 class Model(object):
     """Model object class:"""
-    today = dt.datetime.today().date().isoformat()
 
     def __init__(self, config):
         """instantiates model class object"""
@@ -33,6 +32,7 @@ class Model(object):
         self.train_set = None
         self.to_score = None
         self.config = config
+        self.today = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
 
     def load_data(self, start_date, end_date):
         """Load data for training"""
@@ -50,13 +50,13 @@ class Model(object):
                                       relative_path + '/credentials/leadscoring.json')
 
         salesforce_data = clean_data.clean_salesforce_data(
-            bq_client, 
-            salesforce_query, 
+            bq_client,
+            salesforce_query,
             self.config["OUTPUTS_PATH"]
         )
         ga_paths = clean_data.clean_ga_data(
-            bq_client, 
-            ga_query, 
+            bq_client,
+            ga_query,
             self.config["OUTPUTS_PATH"]
         )
 
@@ -67,7 +67,7 @@ class Model(object):
 
         raw_data = clean_data.merge_datasets(
             datasets,
-            startdate, 
+            startdate,
             enddate,
             self.config["OUTPUTS_PATH"],
         )
@@ -90,23 +90,24 @@ class Model(object):
     def create_score_set(self, datasets, startdate, enddate):
         """Creates dataset for scoring"""
         score_set = clean_data.merge_datasets(
-            datasets, 
-            startdate, 
-            enddate, 
+            datasets,
+            startdate,
+            enddate,
             self.config["OUTPUTS_PATH"]
         )
         _, _, features_set, id_list = clean_data.create_features(
-            score_set, 
+            score_set,
             self.config["OUTPUTS_PATH"],
             self.feat_names
         )
         pca_X = clean_data.pca_transform(
             features_set,
-            features_names,
+            self.feat_names,
             50,
             self.config["OUTPUTS_PATH"]
         )
         data_dict = {}
+
         #id_list is pair of ids: 'trial_order_id', 'salesforce_id'
         for id_pair, feat in zip(id_list, pca_X):
             temp_dict = dict()
@@ -117,6 +118,11 @@ class Model(object):
 
     def split_dataset(self, features, target, test_size=0.4, rd_state=8):
         """Split training data into train and test sets"""
+
+        shuffle_index = np.random.choice(len(target), len(target))[:]
+        target = target[shuffle_index]
+        features = features[shuffle_index]
+
         X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=test_size, random_state=rd_state)
 
         output_path = self.config["OUTPUTS_PATH"]
@@ -143,16 +149,6 @@ class Model(object):
 
     def evaluate_model(self, test_set, train_set):
         """Generate model evaluation metrics"""
-        def classify(classifier, data):
-            """helper function to lower prob thresholds for labeling"""
-            probs = classifier.predict_proba(data)
-            labels = []
-            for i in probs:
-                if i[1] > 0.30:
-                    labels.append(1)
-                else:
-                    labels.append(-1)
-            return labels
 
         y_test, x_test = test_set[0], test_set[1]
         y_train, x_train = train_set[0], train_set[1]
@@ -163,10 +159,8 @@ class Model(object):
         test_cv_score = cross_val_score(self.model, x_test, y_test, cv=10)
         self.evaluation_metrics['cv_test_accuracy'] = test_cv_score.mean()
 
-        yhat_test = classify(self.model, x_test)
-        yhat_train = classify(self.model, x_train)
-        self.evaluation_metrics['threshold_test_accuracy'] = accuracy_score(y_test, yhat_test)
-        self.evaluation_metrics['threshold_train_accuracy'] = accuracy_score(y_train, yhat_train)
+        yhat_test = self.model.predict(x_test)
+        yhat_train = self.model.predict(x_train)
 
         self.evaluation_metrics['train_confusion_matrix'] = confusion_matrix(y_train, yhat_train)
         self.evaluation_metrics['test_confusion_matrix'] = confusion_matrix(y_test, yhat_test)

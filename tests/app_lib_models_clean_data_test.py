@@ -30,7 +30,6 @@ class CleanDataTests(unittest.TestCase):
 
         self.salesforce_query = salesforce_query
         self.ga_query = ga_query
-        self.trial_conv = trial_conversions
         self.gcp_project = gcp_project_name
         self.dataset = dataset_name
         self.table_name = salesforce_table
@@ -58,9 +57,7 @@ class CleanDataTests(unittest.TestCase):
     def test_clean_ga(self):
         """tests clean_ga_data method returns expected dataframe"""
 
-
         ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query)
-
         len_of_data = len(ga_data)
         expected_val = 24996
 
@@ -68,26 +65,14 @@ class CleanDataTests(unittest.TestCase):
                          msg="After cleaning data,\
                           expected {} got {}".format(expected_val, len_of_data))
 
-    def test_clean_trial_conversions(self):
-        """tests clean_trial_conversions returns expected dataframe"""
-
-        trial_conversions = clean_data.clean_conversions_data(self.bq_client, self.trial_conv)
-
-        len_of_data = len(trial_conversions)
-        expected_val = 6246
-
-        self.assertEqual(expected_val, len_of_data,
-                         msg="After cleaning data,\
-                          expected {} got {}".format(expected_val, len_of_data))
 
     def test_merge_datasets(self):
         """tests merge data returns expected dataframe"""
 
-        trial_conversions = clean_data.clean_conversions_data(self.bq_client, self.trial_conv)
         salesforce_data = clean_data.clean_salesforce_data(self.bq_client, self.salesforce_query)
         ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query)
 
-        dataset = [salesforce_data, ga_data, trial_conversions]
+        dataset = [salesforce_data, ga_data]
         final_data = clean_data.merge_datasets(dataset, self.start_date, self.end_date, True)
         final_data_open = clean_data.merge_datasets(dataset, self.start_date, self.end_date, False)
 
@@ -108,11 +93,10 @@ class CleanDataTests(unittest.TestCase):
     def test_create_features(self):
         """tests create_feature function returns expected number of features and observations"""
 
-        trial_conversions = clean_data.clean_conversions_data(self.bq_client, self.trial_conv)
         salesforce_data = clean_data.clean_salesforce_data(self.bq_client, self.salesforce_query)
         ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query)
 
-        dataset = [salesforce_data, ga_data, trial_conversions]
+        dataset = [salesforce_data, ga_data]
         final_data = clean_data.merge_datasets(dataset, self.start_date, self.end_date, True)
         features_names, target_variable, _, _ = clean_data.create_features(final_data)
 

@@ -1,23 +1,25 @@
 """ Salesforce module for pulling lead ids and writing the scored values """
-
+import logging as log
 import pandas as pd
 from simple_salesforce import Salesforce
+from simple_salesforce.exceptions import SalesforceResourceNotFound, SalesforceMalformedRequest
 
 import src.data.queries as query
 
 
-class SalesForce(object):
+class salesforce_api(object):
     """Salesforce object for instantiating client"""
 
     def __init__(self, config, sandbox=True):
+
         # instantiate simple salesforce
         if sandbox:
             self.sf_client = Salesforce(username=config["SALESFORCE_USERNAME"],
                                         password=config["SALESFORCE_PASSWORD"],
                                         security_token=config["SALESFORCE_TOKEN"],
-                                        domain='test')
+                                        sandbox=True)
         else:
-            self.sf_client = SalesForce(username=config["SALESFORCE_USERNAME"],
+            self.sf_client = Salesforce(username=config["SALESFORCE_USERNAME"],
                                         password=config["SALESFORCE_PASSWORD"],
                                         security_token=config["SALESFORCE_TOKEN"])
         self.records = None
@@ -30,7 +32,7 @@ class SalesForce(object):
         :return: dataframe with leads
         """
         query_logic = query.QueryLogic.IMPORT_SALESFORCE_LEADS.format(str(num_days))
-        sf_query = self.sf_client.quelry_all(query_logic)
+        sf_query = self.sf_client.query_all(query_logic)
         self.records = sf_query['records']
         total_size = sf_query['totalSize']
 
@@ -45,7 +47,7 @@ class SalesForce(object):
         salesforce_df['Order_ID__c'] = salesforce_df['Order_ID__c'].combine_first(salesforce_df['Company'])
         self.data = salesforce_df[['Id', 'Order_ID__c', 'Created_Date_Time__c']]
 
-    def write_lead_scores(self, scores):
+    def write_lead_scores(self, scores, old_scores=None):
         """ Writes lead scorees to salesforce
 
         :param scores: Dict of scores where the order_id is the key and value is score
@@ -53,6 +55,20 @@ class SalesForce(object):
         """
         for lead in scores:
             sf_id = lead
-            score = round(scores[lead][0][1]*100, -1)
-            self.sf_client.Lead.update(sf_id, {'OppScoring_score__c': score},
-                                       headers={"Sforce-Auto-Assign": False})
+            score = round(scores[lead][1]*100, -1)
+            try:
+                prev_score = round(old_scores[sf_id][1]*100, -1)
+            except (KeyError, TypeError):
+                prev_score = 0
+
+            if score > prev_score:
+                try:
+                    self.sf_client.Lead.update(sf_id, {'Comm_score__c': score}, headers={"Sforce-Auto-Assign": "False"})
+                except SalesforceResourceNotFound as e:
+                    log.error(e.content)
+                except SalesforceMalformedRequest as e:
+                    log.error(e.content)
+                except TypeError:
+                    log.error("TypeError for lead: {0} with score {1}".format(lead, score))
+
+

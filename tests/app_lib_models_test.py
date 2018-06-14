@@ -24,26 +24,21 @@ class ModelTests(unittest.TestCase):
         self.start_date = dt(2017, 7, 1).date()
         self.end_date = dt(2018, 2, 1).date()
 
-        salesforce_data, ga_paths, trial_conversions = self.model.load_data(self.start_date, self.end_date)
+        salesforce_data, ga_paths = self.model.load_data(self.start_date, self.end_date)
         self.salesforce = salesforce_data
         self.ga_data = ga_paths
-        self.conversions = trial_conversions
 
     def test_load_data(self):
         """Tests load data function is generating approx size data"""
         salesforce_data = self.salesforce
         ga_paths = self.ga_data
-        trial_conversions = self.conversions
         sf_data_sz = len(salesforce_data)
         ga_data_sz = len(ga_paths)
-        conv_data_sz = len(trial_conversions)
 
         self.assertEqual(42700, round(sf_data_sz, -2),
                          msg="Salesforce data size was not as expected. Got {}, expected around 42700".format(sf_data_sz))
         self.assertEqual(134300, round(ga_data_sz, -2),
                          msg="GA data size was not as expected. Got {}, expected around 134300".format(ga_data_sz))
-        self.assertEqual(39500, round(conv_data_sz, -2),
-                         msg="Trial conversion data size was not as expected. Got {}, expected around 39500".format(conv_data_sz))
 
     def test_dataset_size(self):
         """tests dataset is around 31000 observations
@@ -52,8 +47,7 @@ class ModelTests(unittest.TestCase):
         """
         salesforce_data = self.salesforce
         ga_paths = self.ga_data
-        trial_conversions = self.conversions
-        datasets = [salesforce_data, ga_paths, trial_conversions]
+        datasets = [salesforce_data, ga_paths]
 
         self.model.create_model_data(datasets, self.start_date, self.end_date)
 
@@ -66,8 +60,7 @@ class ModelTests(unittest.TestCase):
         """Tests create score set"""
         salesforce_data = self.salesforce
         ga_paths = self.ga_data
-        trial_conversions = self.conversions
-        datasets = [salesforce_data, ga_paths, trial_conversions]
+        datasets = [salesforce_data, ga_paths]
 
         self.model.create_score_set(datasets, self.start_date, self.end_date)
 
@@ -80,8 +73,7 @@ class ModelTests(unittest.TestCase):
         """"Test split size"""
         salesforce_data = self.salesforce
         ga_paths = self.ga_data
-        trial_conversions = self.conversions
-        datasets = [salesforce_data, ga_paths, trial_conversions]
+        datasets = [salesforce_data, ga_paths]
 
         self.model.create_model_data(datasets, self.start_date, self.end_date)
 
