@@ -29,10 +29,90 @@ class QueryLogic(object):
         converted_to_opp, 
         opp_createdate, 
         opp_iswon, 
-        opp_CloseDate 
+        opp_CloseDate
     FROM `v1-dev-main.LeadScoring.v1v2_leads_opps`
     WHERE lead_createdate >= '{}' and lead_createdate <= '{}'
     """
+
+    OPPS_QUERY = '''
+    SELECT 
+        salesforce_id,
+        leadsource,
+        lead_createdate,
+        trial_order_detail_id,
+        converted_to_opp, 
+        opp_createdate
+    FROM `v1-dev-main.LeadScoring.v1v2_leads_opps`
+    WHERE lead_createdate >= '{}' and lead_createdate <= '{}'
+    '''
+
+    ADMINPV_QUERY = '''
+    SELECT 
+        inserted_at, 
+        timestamp_millis(timestamp) as timestamp, 
+        url, 
+        client_id, 
+        u_id, 
+        sid, 
+        pid, 
+        property_id, 
+        devicetype, 
+        version, 
+        lastpage, 
+        landingpage, 
+        optimizely, 
+        continent, 
+        country, 
+        state, 
+        city, 
+        zip, 
+        timezone, 
+        latitude, 
+        longitude 
+    FROM `v1-dev-main.mrkt_data_analytics.vw_v1v2_admin_pageviews` 
+    WHERE CAST(inserted_at as date) >= '{}' and CAST(inserted_at as date) <= '{}'    
+    '''
+
+    V2Clicks_QUERY = '''
+    SELECT 
+        inserted_at,
+        tenantId, 
+        action, 
+        value, 
+        isTrial, 
+        client_id, 
+        planType
+    FROM `v1-dev-main.mrkt_data_analytics.trial_activity` 
+    WHERE tenantid is not null and
+    CAST(inserted_at as date) >= '{}' and CAST(inserted_at as date) <= '{}'
+    '''
+
+    SFTASKS_QUERY = '''
+    SELECT 
+        task_id, 
+        lead_id, 
+        opportunity_id, 
+        Reason_Not_Qualified__c, 
+        leadsource, 
+        order_id, 
+        order_detail_id,
+        tenant_id__c, 
+        company, 
+        lead_createddate, 
+        Created_Date_and_Time__c, 
+        Activity_Type__c, 
+        ActivityDate, 
+        Call_Duration_in_Hours__c, 
+        TaskSubtype, 
+        WhatId, 
+        Description, 
+        ringdna__Call_Connected__c, 
+        ringdna__Call_Duration_min__c, 
+        ringdna__Queue_Hold_Time__c 
+    FROM `v1-dev-main.LeadScoring.vw_tasks` 
+    WHERE lead_createdate >= '{}' and lead_createdate <= '{}'    
+    '''
+
 
     GA_QUERY = """
     SELECT 
@@ -78,12 +158,3 @@ class QueryLogic(object):
     FROM `v1-dev-main.LeadScoring.trial_conversions`
     WHERE trial_date >= '{}' and trial_date <= '{}'
     """
-
-    IMPORT_SALESFORCE_LEADS = """SELECT ID, 
-                            Created_Date_Time__c, 
-                            order_ID__C, 
-                            company
-                            FROM LEAD 
-                            WHERE 
-                            RecordTypeID IN ('01270000000EAWZAA4', '01270000000Q4tBAAS') 
-                            and CreatedDate = LAST_N_DAYS:{}"""

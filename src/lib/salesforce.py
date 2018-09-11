@@ -1,6 +1,9 @@
 """ Salesforce module for pulling lead ids and writing the scored values """
+import time
+
 import logging as log
 import pandas as pd
+import numpy as np
 from simple_salesforce import Salesforce
 from simple_salesforce.exceptions import SalesforceResourceNotFound, SalesforceMalformedRequest
 
@@ -56,6 +59,11 @@ class salesforce_api(object):
         for lead in scores:
             sf_id = lead
             score = round(scores[lead][1]*100, -1)
+
+            a_num = np.random.choice(100)
+            if a_num > 90:
+                time.sleep(3)
+
             try:
                 prev_score = round(old_scores[sf_id][1]*100, -1)
             except (KeyError, TypeError):
@@ -63,6 +71,7 @@ class salesforce_api(object):
 
             if score > prev_score:
                 try:
+                    log.info("SF LEAD:{0} has score {1}".format(lead, score))
                     self.sf_client.Lead.update(sf_id, {'Comm_score__c': score}, headers={"Sforce-Auto-Assign": "False"})
                 except SalesforceResourceNotFound as e:
                     log.error(e.content)
@@ -70,5 +79,6 @@ class salesforce_api(object):
                     log.error(e.content)
                 except TypeError:
                     log.error("TypeError for lead: {0} with score {1}".format(lead, score))
+
 
 

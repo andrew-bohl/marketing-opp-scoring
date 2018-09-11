@@ -30,6 +30,7 @@ class Model(object):
         self.evaluation_metrics = {}
         self.test_set = None
         self.train_set = None
+        self.datasets = []
         self.to_score = None
         self.config = config
         self.today = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
@@ -39,6 +40,10 @@ class Model(object):
         query_logic = query.QueryLogic
         salesforce_query = query_logic.SALEFORCE_QUERY.format(start_date, end_date)
         ga_query = query_logic.GA_QUERY.format(start_date, end_date)
+        opps_query = query_logic.OPPS_QUERY.format(start_date, end_date)
+        admin_pv_query = query_logic.ADMINPV_QUERY.format(start_date, end_date)
+        v2clicks_query = query_logic.V2Clicks_QUERY.format(start_date, end_date)
+        tasks_query = query_logic.SFTASKS_QUERY.format(start_date, end_date)
 
         gcp_project_name = self.config["BQ_PROJECT_ID"]
         dataset_name = self.config["LEADSCORING_DATASET"]
@@ -49,40 +54,48 @@ class Model(object):
         bq_client = bq.BigQueryClient(gcp_project_name, dataset_name, salesforce_table,
                                       relative_path + '/credentials/leadscoring.json')
 
-        salesforce_data = clean_data.clean_salesforce_data(
-            bq_client,
-            salesforce_query,
-            self.config["OUTPUTS_PATH"]
-        )
         ga_paths = clean_data.clean_ga_data(
             bq_client,
             ga_query,
             self.config["OUTPUTS_PATH"]
         )
 
-        return salesforce_data, ga_paths
+
+        salesforce_data = clean_data.clean_ga_data(
+            bq_client,
+            salesforce_query,
+            self.config["OUTPUTS_PATH"]
+        )
+
+        opps_data = clean_data.clean_opps_data(
+            bq_client,
+            opps_query,
+            self.config["OUTPUTS_PATH"]
+        )
+
+        admin_data = clean_data.clean_admin_data(
+            bq_client,
+            admin_pv_query,
+            self.config["OUTPUTS_PATH"]
+        )
+
+        v2_clicks_data = clean_data.clean_v2clicks_data(
+            bq_client,
+            v2clicks_query,
+            self.config["OUTPUTS_PATH"]
+        )
+
+        tasks_data = clean_data.clean_tasks_data(
+            bq_client,
+            tasks_query,
+            self.config["OUTPUTS_PATH"]
+        )
+
+        return opps_data, ga_paths, tasks_data, v2_clicks_data, admin_data, salesforce_data
 
     def create_model_data(self, datasets, startdate, enddate):
         """Creates dataset for model training"""
-
-        raw_data = clean_data.merge_datasets(
-            datasets,
-            startdate,
-            enddate,
-            self.config["OUTPUTS_PATH"],
-        )
-        features_names, target_variable, features_set, _ = clean_data.create_features(
-            raw_data,
-            self.config["OUTPUTS_PATH"]
-        )
-        pca_X = clean_data.pca_transform(
-            features_set,
-            features_names,
-            50,
-            self.config["OUTPUTS_PATH"]
-        )
-
-        self.features = pca_X
+        self.ids = {}
         self.target = target_variable
         self.feat_names = features_names
         log.info("Model uses %d features" % (len(features_names)))

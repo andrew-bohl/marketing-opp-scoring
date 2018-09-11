@@ -5,7 +5,6 @@ import datetime as dt
 import logging as log
 
 import numpy as np
-from sklearn.decomposition import IncrementalPCA
 import pandas as pd
 import urllib.parse as url
 
@@ -13,63 +12,71 @@ from src.data import filters
 import src.lib.models.utilities as utils
 
 
-def clean_salesforce_data(client, sql, output_path):
-    """Transforms data for salesforce
+date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
 
-    :return: SalesForce dataframe
+
+def clean_admin_data(client, sql, output_path):
+    """Cleans the opportunity conversion data
+
+    :param client: BQ client
+    :param sql: sql query
+    :param output_path: where to save file
+    :return: cleaned opp data
     """
-    def filter_bad_orderids(dataframe, colname, filter_num):
-        """filter out bad orderids"""
-        dataframe['to_keep'] = dataframe[colname].apply(lambda x: len(x) >= filter_num)
-        dataframe = dataframe[dataframe['to_keep'] == 1]
-        return dataframe
+    admin_data = utils.load_bigquery_data(client, sql)
+    admin_data['inserted_at'] = pd.to_datetime(admin_data['inserted_at'])
+    admin_data = admin_data[admin_data['url'].notnull()]
+    admin_data['url_path'] = admin_data['url'].apply(lambda x: x[x.find('.com')+5:])
+    admin_data['url_path'] = admin_data['url_path'].apply(lambda x: x[:x.find('/')+1])
+    admin_data.loc[admin_data['url_path'] == '', 'url_path'] = admin_data[admin_data['url_path'] == '']['url'].apply(lambda x: x[x.find('/')+1:])
+    admin_data['url_path'] = admin_data['url_path'].apply(lambda x: x.replace('/', ''))
+    admin_data = admin_data[~admin_data['url_path'].str.contains('localhost')]
+    admin_data = admin_data[~admin_data['url_path'].str.contains('admin-dev')]
 
-    salesforce_data = utils.load_bigquery_data(client, sql)
+    unique_urlpaths = admin_data.groupby('url_path').count()['pid'].reset_index().sort_values('pid', ascending=False)
+    top_urls = unique_urlpaths['url_path'].head(8).tolist()
 
-    # runs this one first because filters are case sensitive
-    salesforce_data = utils.filter_data(filters.NotQualified, salesforce_data)
-    salesforce_data = utils.filter_data(filters.LeadType, salesforce_data)
-    salesforce_data = utils.standardize_columns(salesforce_data)
+    admin_data['url_path_2'] = admin_data['url_path'].apply(lambda x: x if x in top_urls else 'Other')
+    admin_data = admin_data.join(pd.get_dummies(admin_data['url_path_2']))
 
-    #filters out ids not of len 7
+    admin_data.to_csv(output_path + "admin_data_" + str(date_suffix) + ".csv")
 
-    salesforce_data = filter_bad_orderids(salesforce_data, 'trial_order_id', 7)
-    salesforce_data = salesforce_data.sort_values(['trial_order_id', 'lead_createdate'], ascending=False)\
-        .groupby('trial_order_id').first().reset_index()
+    return admin_data
 
-    salesforce_data = utils.convert_cols_to_datetime(salesforce_data)
 
-    #create hour of day feature
-    salesforce_data["hour_of_day"] = salesforce_data["lead_createdate"].apply(lambda x: x.hour)
+def clean_v2clicks_data(client, sql, output_path):
+    """Cleans v2clicks data for model
 
-    print(salesforce_data['converted_to_opp'].sum())
-    print("Number of converted in sample")
+    :param client: BQ client
+    :param sql: sql query
+    :param output_path: where to save file
+    :return: cleaned opp data
+    """
+    v2_clicks_data = utils.load_bigquery_data(client, sql)
+    v2_clicks_data['inserted_at'] = pd.to_datetime(v2_clicks_data['inserted_at'])
+    v2_clicks_data = v2_clicks_data.join(pd.get_dummies(v2_clicks_data['action']))
+    v2_clicks_data.to_csv(output_path + "v2_clicks_data_" + str(date_suffix) + ".csv")
+    return v2_clicks_data
 
-    salesforce_data['created_date_dt'] = salesforce_data['lead_createdate'].apply(lambda x: x.date())
 
-    def impute_opp_close_date(createdate):
-        """calculated a close date"""
-        if createdate:
-            newdate = createdate + dt.timedelta(days=14)
-            return newdate
-        else:
-            return createdate
+def clean_tasks_data(client, sql, output_path):
+    """Cleans salesforce tasks data for merging
+    :param client: BQ client
+    :param sql: sql query
+    :param output_path: where to save file
+    :return: cleaned tasks data
+    """
 
-    salesforce_data['lead_close_date_impute'] = salesforce_data['lead_createdate'].apply(impute_opp_close_date)
-    salesforce_data['lead_close_date_impute'] = pd.to_datetime(salesforce_data['lead_close_date_impute'])
-    salesforce_data['lead_close_date_impute'] = salesforce_data['opp_createdate'].\
-        combine_first(salesforce_data['lead_close_date_impute'])
+    tasks_data = utils.load_bigquery_data(client, sql)
+    task_values = tasks_data.groupby('Activity_Type__c').count()['task_id'].reset_index().sort_values('task_id', ascending=False)
+    top_tasks = task_values['Activity_Type__c'].head(6).tolist()
+    tasks_data['activity_type_2'] = tasks_data['Activity_Type__c'].apply(lambda x: x if x in top_tasks else 'Other')
+    tasks_data['TaskSubtype'] = tasks_data['TaskSubtype'].apply(lambda x: x+ "_sub")
 
-    salesforce_data['lead_close_date_impute'] = salesforce_data['lead_close_date_impute'].apply(lambda x: x.date())
-    salesforce_data['lead_createdate'] = pd.to_datetime(salesforce_data['lead_createdate'])
-    salesforce_data['lead_createdate'] = salesforce_data['lead_createdate'].apply(lambda x: x.date())
-
-    salesforce_data = salesforce_data[salesforce_data['lead_createdate'] <= salesforce_data['lead_close_date_impute']]
-
-    date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
-
-    salesforce_data.to_csv(output_path + "salesforce_" + str(date_suffix) + ".csv")
-    return salesforce_data
+    tasks_data = tasks_data.join(pd.get_dummies(tasks_data[['activity_type_2', 'TaskSubtype']]))
+    tasks_data['trial_id'] = tasks_data['order_detail_id'].combine_first(tasks_data['tenant_id__c'])
+    tasks_data.to_csv(output_path + "tasks_data_" + str(date_suffix) + ".csv")
+    return tasks_data
 
 
 def clean_ga_data(client, sql, output_path):
@@ -102,172 +109,263 @@ def clean_ga_data(client, sql, output_path):
     ga_paths = utils.load_bigquery_data(client, sql)
     ga_paths = utils.standardize_columns(ga_paths)
     ga_paths = utils.convert_cols_to_datetime(ga_paths)
-    ga_paths['session_date'] = ga_paths['date']
 
-    ga_paths['landingpagepath'] = ga_paths['landingpagepath'].fillna('')
+    ga_paths['session_date'] = ga_paths['date']
+    ga_paths = ga_paths[ga_paths['landingpagepath'].notnull()]
     ga_paths = ga_paths[~ga_paths['landingpagepath'].str.contains('store.volusion.com')]
     ga_paths['landingpagepath'] = ga_paths['landingpagepath'].apply(lambda x: url.urlparse(x)[2])
+
+    ga_paths['landingpagepath'] = ga_paths['landingpagepath']\
+        .apply(lambda x: 'www.volusion.com/login' if x.find('login') >= 0 else x)
+    ga_paths['landingpagepath'] = ga_paths['landingpagepath'].apply(lambda x: x.replace('/v2', ''))
+    ga_paths['landingpagepath'] = ga_paths['landingpagepath'].apply(lambda x: x.replace('/v1', ''))
+
+    top_landingpages = ga_paths[['landingpagepath']].apply(pd.value_counts)\
+        .sort_values('landingpagepath', ascending=False).head(20).reset_index()['index'].tolist()
+    ga_paths['landingpagepath_2'] = ga_paths['landingpagepath'].apply(lambda x: x if x in top_landingpages else 'Other')
 
     ga_paths['campaign'] = ga_paths['campaign'].fillna('')
     ga_paths['non_brand'] = ga_paths['campaign'].apply(lambda x: 1 if x.find('-nbr-') else 0)
     ga_paths['landingpage_class'] = ga_paths['landingpagepath'].apply(landing_page_classification)
-    ga_paths["landingpage_class"] = ga_paths["landingpage_class"].astype("category")
-
-    ga_paths = ga_paths.join(pd.get_dummies(ga_paths["landingpage_class"]), how='left', rsuffix='_lp_ct')
-
-    date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
+    ga_paths['date'] = pd.to_datetime(ga_paths['date'])
 
     ga_paths.to_csv(output_path + "ga_sessions_" + str(date_suffix) + ".csv")
     return ga_paths
 
 
-def merge_datasets(dataset, startdate, enddate, output_path):
-    """merge intermediate datasets into one for feature extraction
+def clean_opps_data(client, sql, output_path):
+    """Transforms data for salesforce
 
-    :param dataset: list of dataframes including salesforce_data, ga_data
-    :param startdate: dataset start date
-    :param enddate: end date of observations to include
-    :param output_path: path to save file
-    :return: merged dataframe for feature extraction
+    :return: SalesForce dataframe
     """
-    salesforce_df, ga_df = dataset[0], dataset[1]
+    opps_data = utils.load_bigquery_data(client, sql)
+    opps_data['lead_createdate'] = pd.to_datetime(opps_data['lead_createdate'])
+    opps_data = opps_data[dt.datetime.today() - opps_data['lead_createdate'] >= dt.timedelta(days=21)].sort_values(
+        'lead_createdate', ascending=False)
 
-    #merge sf and ga data
-    paths_sf = salesforce_df.set_index("trial_order_detail_id").join(ga_df.set_index('demo_lookup'), rsuffix='_ga', how='left')
-    paths_sf['date'] = paths_sf['date'].apply(lambda x: x.date())
-    paths_sf = paths_sf[(paths_sf['date'] <= paths_sf['lead_close_date_impute']) | (paths_sf['date'].isnull())]
-
-    session_counts = paths_sf.reset_index().groupby('index').count()['session_id']
-    landingpage_counts = paths_sf.reset_index().groupby('index').sum()[['non_brand', u'admin',
-                                                                        u'affiliate', 'blog',
-                                                                        u'brand', u'competitor',
-                                                                        'display', 'guides',
-                                                                        'sem', 'site']]
-
-    marketing_sources = ga_df[ga_df['first_demo_session'].notnull()]
-
-    #master dataframe
-    data_merged = salesforce_df.set_index("trial_order_detail_id").join(marketing_sources.set_index('demo_lookup'), how='left', rsuffix='_ms')
-
-    data_merged = data_merged.join(session_counts, how='left', rsuffix='_count')
-    data_merged = data_merged.join(landingpage_counts, how='left', rsuffix='_page_counts')
-    data_merged['session_id_count'] = data_merged['session_id_count'].fillna(0)
-    data_merged['session_count'] = data_merged['session_id_count']
-
-    blog_sessions = ga_df[ga_df['landingpagepath'].str.contains("blog")].groupby('demo_lookup').count()['session_id']
-    data_merged = data_merged.join(blog_sessions, how='left', rsuffix='_blog')
-    data_merged['blog_sessions'] = data_merged['session_id_blog']
-    return data_merged
+    opps_data.to_csv(output_path + "opps_data_" + str(date_suffix) + ".csv")
+    return opps_data
 
 
+def clean_leads_data(client, sql, output_path):
+    """Clean salesforce data for model
 
-def pca_transform(features, feature_names, ncomponents=50, output_path=''):
-    """PCA transform dataset
-
-    :param features: featureset to transform
-    :param feature_names: feature names to transform
-    :param ncomponents: number of principal components
+    :return: SalesForce dataframe
     """
-
-    #print(feature_names.shape)
-    #print(features.shape)
-
-    pca = IncrementalPCA(n_components=ncomponents, batch_size=50)
-    pca.fit(features)
-    log.info('{} variance explained by {} components.'.format(pca.explained_variance_ratio_.sum(), ncomponents))
-
-    i = np.identity(features.shape[1])
-    coef = pca.transform(i)
-
-    date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
-
-    feat_weights = pd.DataFrame(coef, columns=range(1, coef.shape[1]+1), index=feature_names[3:]).sort_values(1, ascending=False)
-    feat_weights.to_csv(output_path+"pca_feat_weights_" + str(date_suffix) +".csv", sep=",")
-
-    pca_X = pca.transform(features)
-    np.save(output_path+'opp_PCA_X'+str(date_suffix), pca_X)
-    return pca_X
-
-
-def create_features(data, output_path, feature_names=None):
-    """Create features from data"""
-
-    # transformed_vars
-    data['affiliate_touch'] = data['click_id'].notnull()
-    data['affiliate_touch'] = data['affiliate_touch'].apply(lambda x: 1 if x else 0)
-    t = ['True', 'Yes']
-    data['have_products'] = data['have_products__c'].isin(t).apply(lambda x: 1 if x else 0)
-
-    data['lead_day_of_week'] = data['lead_createdate'].apply(lambda x: x.weekday())
 
     def parse_industries(dataframe):
         i_list = []
         for x in dataframe['industry__c'].unique():
             if x:
-                for ind in x.split(" / "):
-                    i_list.append(ind)
+                for industry in x.split(" / "):
+                    i_list.append(industry)
                 i_list = list(set(i_list))
         return i_list
 
-    industry_list = parse_industries(data)
+    def filter_bad_orderids(dataframe, colname, filter_num):
+        """filter out bad orderids"""
+        dataframe['to_keep'] = dataframe[colname].apply(lambda x: len(x) >= filter_num)
+        dataframe = dataframe[dataframe['to_keep'] == 1]
+        return dataframe
+
+    salesforce_data = utils.load_bigquery_data(client, sql)
+
+    # runs this one first because filters are case sensitive
+    salesforce_data = utils.filter_data(filters.NotQualified, salesforce_data)
+    salesforce_data = utils.filter_data(filters.LeadType, salesforce_data)
+    salesforce_data = utils.standardize_columns(salesforce_data)
+
+    # filters out ids not of len 7
+
+    salesforce_data = filter_bad_orderids(salesforce_data, 'trial_order_id', 7)
+    salesforce_data = salesforce_data.sort_values(['trial_order_id', 'lead_createdate'], ascending=False) \
+        .groupby('trial_order_id').first().reset_index()
+    salesforce_data = utils.convert_cols_to_datetime(salesforce_data)
+
+    top_country = salesforce_data.groupby('country').count()['trial_order_id'].reset_index() \
+        .sort_values('trial_order_id', ascending=False)['country'].head(5).tolist()
+    salesforce_data['country_2'] = salesforce_data['country'].apply(lambda x: x if x in top_country else 'Other')
+
+    # create hour of day feature
+    salesforce_data["hour_of_day"] = salesforce_data["lead_createdate"].apply(lambda x: x.hour)
+
+    leadowners = salesforce_data[['Lead_Owner_Full_Name__c']].apply(pd.value_counts) \
+        .sort_values('Lead_Owner_Full_Name__c', ascending=False).reset_index().head(30)['index'].tolist()
+    salesforce_data['leadowners_2'] = salesforce_data['Lead_Owner_Full_Name__c'] \
+        .apply(lambda x: x if x in leadowners else 'Other')
+
+    salesforce_data['created_date_dt'] = salesforce_data['lead_createdate'].apply(lambda x: x.date())
+
+    salesforce_data['industry__c'] = salesforce_data['industry__c'].fillna('NA')
+    industry_list = parse_industries(salesforce_data)
+
     for ind in industry_list:
-        data[ind] = 0
-        data.loc[(data["industry__c"].notnull()) & (data["industry__c"].str.contains(ind)), ind] = 1
+        salesforce_data[ind] = 0
+        salesforce_data.loc[(salesforce_data["industry__c"].notnull())
+                            & (salesforce_data["industry__c"].str.contains(ind)), ind] = 1
 
-    transformed_vars = ['converted_to_opp', 'blog_sessions', 'affiliate_touch', 'have_products', 'session_count',
-                        'non_brand_page_counts', u'admin_page_counts', 'affiliate_page_counts', u'blog_page_counts',
-                        u'brand_page_counts', u'competitor_page_counts', u'display_page_counts', u'guides_page_counts',
-                        u'sem_page_counts', u'site_page_counts']
+    lead_types_list = salesforce_data.groupby('lead_type__c').count()['trial_order_id'] \
+        .sort_values(ascending=False).head(10).reset_index()['lead_type__c'].tolist()
+    salesforce_data['lead_type_2'] = salesforce_data['lead_type__c'] \
+        .apply(lambda x: x if x in lead_types_list else 'Other')
 
-    transformed_vars.extend(industry_list)
+    salesforce_data.to_csv(output_path + "salesforce_" + str(date_suffix) + ".csv")
 
-    id_vars = ['trial_order_id', 'salesforce_id']
+    return salesforce_data
 
-    # get dummy variables
-    cat_variables = ['u_version', 'landingpage_class', 'devicecategory', 'medium',
-                     u'socialnetwork', u'country_ms', u'lead_type__c', u'leadsource',
-                     'device_type__c', u'number_of_products_selling__c', u'sms_opt_in__c',
-                     'socialsignup__c', 'gender__c', 'have_products__c', 'position__c', 'lead_day_of_week',
-                     u'hour_of_day']
 
-    for x in cat_variables:
-        data[x] = data[x].astype('category')
+def make_admin_dataset(admin_data, opps_data, training=True):
+    """Creates the feature set for the first model"""
 
-    fill = ['session_id_count', 'non_brand_page_counts', u'admin_page_counts',
-            u'affiliate_page_counts', u'blog_page_counts', u'brand_page_counts',
-            u'competitor_page_counts', u'display_page_counts',
-            u'guides_page_counts', u'sem_page_counts', u'site_page_counts',
-            u'session_count', u'session_id_blog', u'blog_sessions',
-            u'affiliate_touch']
+    opps_admin = pd.merge(opps_data, admin_data, left_on='trial_order_detail_id', right_on='u_id', how='inner')
+    opps_admin = opps_admin.join(pd.get_dummies(opps_admin['version']))
+    opps_admin['cut_off'] = opps_admin['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
+    opps_admin['opp_createdate'] = pd.to_datetime(opps_admin[opps_admin['opp_createdate'].notnull()]['opp_createdate'])
+    opps_admin['inserted_at_date'] = opps_admin['inserted_at'].apply(lambda x: x.date())
 
-    for x in fill:
-        data[x] = data[x].fillna(0)
+    if training:
+        opps_admin['cut_off'] = opps_admin['opp_createdate'].combine_first(opps_admin['cut_off']).apply(lambda x: x.date())
+        opps_admin = opps_admin[opps_admin['inserted_at_date'] <= opps_admin['cut_off']]
 
-    for t_var in transformed_vars:
-        if t_var not in data.columns:
-            data[t_var] = 0
+    opps_mdl_data = opps_admin.groupby('trial_order_detail_id').sum()
+    opps_mdl_data['converted_to_opp'] = opps_mdl_data['converted_to_opp'].apply(lambda x: 1 if x > 0 else 0)
+    opps_mdl_data['v1'] = opps_mdl_data['v1'].apply(lambda x: 1 if x > 0 else 0)
+    opps_mdl_data['v2'] = opps_mdl_data['v2'].apply(lambda x: 1 if x > 0 else 0)
 
-    dummies = pd.get_dummies(data[cat_variables])
-    joined_dummies = data[id_vars + transformed_vars].join(dummies)
+    top_urls = admin_data['url_path_2'].unique().tolist()
+    top_urls.append('v1')
+    top_urls.append('v2')
+    top_urls.append('converted_to_opp')
 
-    try:
-        for feat in feature_names:
-            if feat not in joined_dummies.columns:
-                joined_dummies[feat] = 0
-        joined_dummies = joined_dummies[feature_names]
-    except TypeError:
-        pass
+    opps_mdl_data = opps_mdl_data[top_urls].reset_index()
+    opps_mdl_data = opps_mdl_data.fillna(0)
+    opps_mdl_data_norm = (opps_mdl_data[opps_mdl_data.columns[1:-1]] - opps_mdl_data[
+        opps_mdl_data.columns[1:-1]].mean()) / (opps_mdl_data[opps_mdl_data.columns[1:-1]].max()\
+                                                - opps_mdl_data[opps_mdl_data.columns[1:-1]].min())
 
-    features_names = joined_dummies.columns
-    features_set = joined_dummies[joined_dummies.columns[3:]].values
-    target_variable = joined_dummies['converted_to_opp'].values
-    id_list = joined_dummies[id_vars].values
+    X_opps_admin = opps_mdl_data_norm.values
+    Y_opps_admin = opps_mdl_data[['converted_to_opp', 'trial_order_detail_id']].values
+    return X_opps_admin, Y_opps_admin
 
-    date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
 
-    np.save(output_path+'id_list_'+ str(date_suffix), id_list)
-    np.save(output_path+'opp_features_names_'+str(date_suffix), features_names)
-    np.save(output_path+'opp_raw_features_X_'+str(date_suffix), features_set)
-    np.save(output_path+'opp_target_Y_'+str(date_suffix), target_variable)
+def make_v2click_dataset(v2_clicks_data, opps_data, training=True):
+    """Make dataset for v2clicks model"""
 
-    return features_names, target_variable, features_set, id_list
+    feats = v2_clicks_data['action'].unique().tolist()
+    opps_v2clicks = pd.merge(opps_data, v2_clicks_data, left_on='trial_order_detail_id',
+                             right_on='tenantId',
+                             how='inner')
+
+    opps_v2clicks['opp_createdate'] = pd.to_datetime(
+        opps_v2clicks[opps_v2clicks['opp_createdate'].notnull()]['opp_createdate'])
+    opps_v2clicks['inserted_at_date'] = opps_v2clicks['inserted_at'].apply(lambda x: x.date())
+
+    if training:
+        opps_v2clicks['cut_off'] = opps_v2clicks['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
+        opps_v2clicks['cut_off'] = opps_v2clicks['opp_createdate'].combine_first(opps_v2clicks['cut_off'])\
+            .apply(lambda x: x.date())
+        opps_v2clicks = opps_v2clicks[opps_v2clicks['inserted_at_date'] <= opps_v2clicks['cut_off']]
+
+    opps_v2clicks = opps_v2clicks.groupby('trial_order_detail_id').sum().reset_index()
+    opps_v2clicks['converted_to_opp'] = opps_v2clicks['converted_to_opp'].apply(lambda x: 1 if x > 0 else 0)
+
+    opps_v2clicks_norm = (opps_v2clicks[feats] - opps_v2clicks[feats].mean()) / (
+                opps_v2clicks[feats].max() - opps_v2clicks[feats].min())
+
+    X_opps_v2clicks = opps_v2clicks_norm.values
+    Y_opps_v2clicks = opps_v2clicks[['converted_to_opp', 'trial_order_detail_id']].values
+
+    return X_opps_v2clicks, Y_opps_v2clicks
+
+
+def make_tasks_dataset(tasks_data, opps_data, training=True):
+    """make dataset for tasks model"""
+
+    tasks_data_opps = pd.merge(opps_data, tasks_data, left_on='trial_order_detail_id', right_on='trial_id', how='inner')
+
+    tasks_data_opps['cut_off'] = tasks_data_opps['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
+    tasks_data_opps['opp_createdate'] = pd.to_datetime(tasks_data_opps['opp_createdate'])
+    tasks_data_opps['ActivityDate'] = pd.to_datetime(tasks_data_opps['ActivityDate']).apply(lambda x: x.date())
+
+    if training:
+        tasks_data_opps['cut_off'] = tasks_data_opps['opp_createdate'].combine_first(tasks_data_opps['cut_off'])\
+            .apply(lambda x: x.date())
+
+        tasks_data_opps = tasks_data_opps[tasks_data_opps['ActivityDate'] <= tasks_data_opps['cut_off']]
+
+    tasks_data_opps = tasks_data_opps.groupby('trial_id').sum().reset_index()
+    tasks_data_opps['converted_to_opp'] = tasks_data_opps['converted_to_opp'].apply(lambda x: 1 if x > 0 else 0)
+    feats = tasks_data_opps.columns
+
+    tasks_data_opps_norm = (tasks_data_opps[feats[2:]] - tasks_data_opps[feats[2:]].mean()) / \
+                           (tasks_data_opps[feats[2:]].max() - tasks_data_opps[feats[2:]].min())
+
+    X_opps_tasks = tasks_data_opps_norm.values
+    Y_opps_tasks = tasks_data_opps[['converted_to_opp', 'trial_id']].values
+
+    return X_opps_tasks, Y_opps_tasks
+
+
+def make_leads_dataset(salesforce_data, training=True):
+    """Transforms data for salesforce for model
+
+    :return: SalesForce dataframe
+    """
+
+    def parse_industries(dataframe):
+        i_list = []
+        for x in dataframe['industry__c'].unique():
+            if x:
+                for industry in x.split(" / "):
+                    i_list.append(industry)
+                i_list = list(set(i_list))
+        return i_list
+
+    industry_list = parse_industries(salesforce_data)
+    dummies_col_lts = ['lead_type_2', 'leadsource', 'leadowners_2', 'Device_Type__c', 'Gender__c', 'Position__c',
+                       'country_2']
+
+    cols = []
+    cols.extend(industry_list)
+    cols.append('trial_order_detail_id')
+    cols.append('converted_to_opp')
+
+    cols.reverse()
+
+    salesforce_data = salesforce_data[cols].join(pd.get_dummies(salesforce_data[dummies_col_lts]))
+    salesforce_data['converted_to_opp'] = salesforce_data['converted_to_opp'].apply(lambda x: 1 if x == 'True' else 0)
+
+    feat_set = salesforce_data.columns
+    opps_norm = (salesforce_data[feat_set[2:]] - salesforce_data[feat_set[2:]].mean()) / (
+            salesforce_data[feat_set[2:]].max() - salesforce_data[feat_set[2:]].min())
+
+    X_opps_sf = opps_norm.values
+    Y_opps_sf = opps_norm[['converted_to_opp', 'trial_order_detail_id']].values
+
+    return X_opps_sf, Y_opps_sf
+
+
+def make_ga_dataset(ga_paths, opps_data, training=True):
+    """Make dataset for GA data model"""
+
+    opps_paths = pd.merge(ga_paths, opps_data, left_on='demo_lookup', right_on='trial_order_detail_id')
+    opps_paths['opp_createdate'] = pd.to_datetime(opps_paths['opp_createdate'])
+    opps_paths['date'] = pd.to_datetime(opps_paths['date']).apply(lambda x: x.date())
+
+    if training:
+        opps_paths['cut_off'] = opps_paths['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
+        opps_paths['cut_off'] = opps_paths['opp_createdate'].combine_first(opps_paths['cut_off'])\
+            .apply(lambda x: x.date())
+        opps_paths = opps_paths[opps_paths['date'] <= opps_paths['cut_off']]
+
+    cols = ['trial_order_detail_id', 'converted_to_opp', 'non_brand']
+    feats = ['landingpage_class', 'devicecategory', 'brand_nonbrand', 'landingpagepath_2', 's_version']
+    opps_path_feats = opps_paths[cols].join(pd.get_dummies(opps_paths[feats]))
+    feat_set = opps_path_feats.columns
+    opps_path_feats_norm = (opps_path_feats[feat_set[2:]] - opps_path_feats[feat_set[2:]].mean()) / (
+                opps_path_feats[feat_set[2:]].max() - opps_path_feats[feat_set[2:]].min())
+
+    X_opps_ga = opps_path_feats_norm.values
+    Y_opps_ga = opps_path_feats[['converted_to_opp', 'trial_order_detail_id']].values
+
+    return X_opps_ga, Y_opps_ga

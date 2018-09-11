@@ -11,7 +11,7 @@ import os
 
 class BaseConfig(object):
     """Class that contains the base config"""
-    APP_NAME = "marketing-lead-scoring"
+    APP_NAME = "marketing-opp-scoring"
     ENV = os.getenv('ENV', 'dev')
 
     # big query configurations
@@ -22,7 +22,7 @@ class BaseConfig(object):
     GA_SESSIONS = os.getenv("GA_SESSIONS_TABLE", 'ga_customer_paths')
     BQ_INSERT_BATCH_SIZE = 500
 
-    BUCKET_NAME = 'marketing-lead-scoring'
+    BUCKET_NAME = 'marketing-opp-scoring'
     GCS_FOLDER = None
     MODEL_NAME = None
 
@@ -31,8 +31,14 @@ class BaseConfig(object):
     TEST_CUTOFF = dt.datetime(2018, 2, 1)
 
     """ SALESFORCE CREDENTIALS """
-    SALESFORCE_USERNAME = os.getenv("SALESFORCE_USERNAME")
-    SALESFORCE_PASSWORD = os.getenv("SALESFORCE_PASSWORD")
-    SALESFORCE_TOKEN = os.getenv("SALESFORCE_TOKEN")
-    SALESFORCE_DOMAIN = os.getenv("SALESFORCE_DOMAIN")
+    #SALESFORCE_USERNAME = os.getenv("SALESFORCE_USERNAME")
+    #SALESFORCE_PASSWORD = os.getenv("SALESFORCE_PASSWORD")
+    #SALESFORCE_TOKEN = os.getenv("SALESFORCE_TOKEN")
+    #SALESFORCE_DOMAIN = os.getenv("SALESFORCE_DOMAIN")
+
+    SALESFORCE_USERNAME = 'sfapi@volusion.com'
+    SALESFORCE_PASSWORD = 'v0lution8PI'
+    SALESFORCE_TOKEN = 'JGLQDKwKhpxQcd7eyoIeB2Jf'
+    SALESFORCE_DOMAIN = 'volusion.com'
+
 
