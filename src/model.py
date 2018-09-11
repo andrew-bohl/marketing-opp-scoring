@@ -119,3 +119,4 @@ def infer(start_date, end_date, flask_config):
         infer(start_date, end_date, flask_config)
 
 
+

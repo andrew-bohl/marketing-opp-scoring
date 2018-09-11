@@ -10,7 +10,6 @@ api = Blueprint('api', __name__, url_prefix='/opp-scoring')
 
 DATE_FMT = "%Y-%m-%d"
 
-
 def _format_date(payload, key, default_time):
     _date = payload.get(key, default_time)
     _date = datetime.strptime(_date, DATE_FMT)
@@ -32,8 +31,8 @@ def score_leads():
     those dates instead.
     """
     midnight = datetime.combine(datetime.today(), time.min)
-    default_start = (midnight - timedelta(days=180)).strftime(DATE_FMT)
-    default_end = (midnight - timedelta(days=30)).strftime(DATE_FMT)
+    default_start = (midnight - timedelta(days=21)).strftime(DATE_FMT)
+    default_end = midnight.strftime(DATE_FMT)
 
     payload = request.get_json() or {}
     start_date = _format_date(payload, "start_date", default_start)
@@ -42,8 +41,8 @@ def score_leads():
 
     t = threading.Thread(group=None,
                          target=model.infer,
-                         name="opp-scoring",
-                         args=(start_date, end_date, flask_config))
+                         name="lead-scoring",
+                         args=(start_date.date(), end_date.date(), flask_config))
     t.start()
     return jsonify(status="Started",)
 
@@ -61,9 +60,10 @@ def train_model():
     called via a POST request with valid start_date and end_dates, we'll use
     those dates instead.
     """
+
     midnight = datetime.combine(datetime.today(), time.min)
-    default_start = (midnight - timedelta(days=1)).strftime(DATE_FMT)
-    default_end = midnight.strftime(DATE_FMT)
+    default_start = (midnight - timedelta(days=210)).strftime(DATE_FMT)
+    default_end = (midnight - timedelta(days=21)).strftime(DATE_FMT)
 
     payload = request.get_json() or {}
     start_date = _format_date(payload, "start_date", default_start)
@@ -76,3 +76,5 @@ def train_model():
                          args=(start_date, end_date, flask_config))
     t.start()
     return jsonify(status="Retraining")
+
+

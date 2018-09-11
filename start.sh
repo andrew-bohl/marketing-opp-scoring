@@ -2,7 +2,7 @@
 
 function KmsDecrypt() {
   local KEYRING="volusion-bi"
-  local KEY="marketing_lead_scoring"
+  local KEY="marketing_opp_scoring"
 
   local CIPHERTEXT="${1}"
   local PLAINTEXT=$(echo ${CIPHERTEXT} | \
