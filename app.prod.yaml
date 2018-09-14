@@ -1,6 +1,6 @@
 runtime: custom
 env: flex
-service: marketing_opp_scoring
+service: marketing-opp-scoring
 
 env_variables:
   ENV: prod
@@ -24,6 +24,6 @@ manual_scaling:
   instances: 1
 resources:
   cpu: 4
-  memory_gb: 10
-  disk_size_gb: 15
+  memory_gb: 20
+  disk_size_gb: 30
 

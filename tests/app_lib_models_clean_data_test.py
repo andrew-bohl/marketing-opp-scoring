@@ -23,7 +23,6 @@ class CleanDataTests(unittest.TestCase):
 
         salesforce_query = self.query_logic.SALEFORCE_QUERY.format(self.start_date, self.end_date)
         ga_query = self.query_logic.GA_QUERY.format(self.start_date, self.end_date)
-        trial_conversions = self.query_logic.TRIAL_CONV_QUERY.format(self.start_date, self.end_date)
         gcp_project_name = self.config["BQ_PROJECT_ID"]
         dataset_name = self.config["LEADSCORING_DATASET"]
         salesforce_table = self.config["SALESFORCE_TABLE"]

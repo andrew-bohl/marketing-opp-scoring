@@ -2,6 +2,7 @@
 import logging as log
 import os
 
+from keras.models import load_model
 import numpy as np
 import pandas as pd
 from sklearn.externals import joblib
@@ -87,7 +88,7 @@ def writeall_gcs_files(gcs_client, bucket_name, filepath='.'):
         write_gcs_file(bucket, os.path.join(filepath, file), file)
 
 
-def load_gcs_model(bucket, model_name=None, foldername=None):
+def load_gcs_model(bucket, model_name=None, foldername='ensemble_model'):
     """ Loads datafiles for data creation and returns a pandas dataframe
 
     :param bucket: gcs bucket
@@ -101,60 +102,54 @@ def load_gcs_model(bucket, model_name=None, foldername=None):
     else:
         model_names = []
         model_dates = []
-        model_features = []
-        for blob in bucket.list_blobs(prefix='opps_model_'):
+        ensemble_model = []
+        ensemble_dates = []
+        for blob in bucket.list_blobs(prefix='/' + foldername+'/model_'):
             model_names.append(blob.name)
             model_dates.append(int(blob.name[11:-4].replace('-', '')))
-            model_features.append('opp_features_names_' + blob.name[11:-4] +'.npy')
+        for blob in bucket.list_blobs(prefix='/' + foldername+'/ensembleNN_model_'):
+            ensemble_model.append(blob.name)
+            ensemble_dates.append(int(blob.name[11:-3].replace('-', '')))
 
-        model_name = model_names[np.argmax(model_dates)]
-        feature_names = model_features[np.argmax(model_dates)]
-        download_blob(bucket, model_name, foldername)
-        download_blob(bucket, feature_names, foldername)
+        model_ix = [i for i in range(len(model_dates)) if np.max(model_dates) == model_dates[i]]
+        ensemble_ix = [i for i in range(len(ensemble_dates)) if np.max(ensemble_dates) == ensemble_dates[i]]
 
-    feature_names = np.load(feature_names)
-    model = joblib.load(model_name)
-    return model, model_name, feature_names
+        logreg_models = {}
+        model_keys = {1: 'sf_leads', 2: 'admin', 3: 'ga', 4: 'tasks', 5: 'v2clicks'}
 
-def load_gcs_scores(bucket, score_file=None, foldername=None):
-    """ Loads datafiles for data creation and returns a pandas dataframe
+        for i in model_ix:
+            download_blob(bucket, model_names[i], foldername)
+            model = joblib.load(model_names[i])
+            for m_name in model_keys.values():
+                if model_names[i].str.find(m_name) >= 0:
+                    logreg_models[m_name] = model
 
-    :param bucket: gcs bucket
-    :param score_file: name of scores file
-    :param foldername; folder location of file
-    :return: dataframe
-    """
-    if score_file:
-        download_blob(bucket, score_file, foldername)
-    # return the latest model
-    else:
-        file_names = []
-        file_dates = []
-        for blob in bucket.list_blobs(prefix='sf_ids'):
-            file_names.append(blob.name)
-            file_dates.append(int(blob.name[6:-4].replace('-', '')))
+        for i in ensemble_ix:
+            download_blob(bucket, ensemble_model[i], foldername)
+            ensembler = load_model(ensemble_model[i])
 
-        try:
-            file_name = file_names[np.argmax(file_dates)]
-            download_blob(bucket, file_name, foldername)
-        except ValueError:
-            return None
+        if len(logreg_models) != 5:
+            log.info("Incorrect number of models, found:{}".format{len(logreg_models)})
 
-    scores = pd.read_csv(file_name)
-    scores.set_index("Unnamed: 0").to_dict(orient='index')
-    return scores
+    return logreg_models, ensembler, str(np.max(model_dates))
 
+def get_percentile_groups(scores):
+    """Calculate percentiles for scores
+    :param scores: list of scores
+    :return two floats for upper and lower cut offs"""
+
+    good = np.percentile(scores, 33)
+    best = np.percentile(scores, 66)
+    return good, best
 
 def standardize_columns(dataframe):
     dataframe.columns = [x.lower() for x in dataframe.columns]
     return dataframe
 
-
 def filter_data(filter, DataFrame):
     """filters dataframe"""
     data = DataFrame[~(DataFrame[filter.name].isin(filter.filters))]
     return data
-
 
 def convert_cols_to_datetime(dataframe):
     """converts date columns to datetime

@@ -1,20 +1,20 @@
 runtime: custom
 env: flex
-service: marketing_opp_scoring
+service: marketing-opp-scoring
 
 env_variables:
   ENV: dev
 
 liveness_check:
   path: "/health-check"
-  check_interval_sec: 30
+  check_interval_sec: 300
   timeout_sec: 4
   failure_threshold: 2
   success_threshold: 2
 
 readiness_check:
   path: "/health-check"
-  check_interval_sec: 30
+  check_interval_sec: 300
   timeout_sec: 4
   failure_threshold: 2
   success_threshold: 2
@@ -23,6 +23,6 @@ readiness_check:
 manual_scaling:
   instances: 1
 resources:
-  cpu: 2
-  memory_gb: 5
-  disk_size_gb: 10
+  cpu: 4
+  memory_gb: 20
+  disk_size_gb: 30

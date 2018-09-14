@@ -31,7 +31,7 @@ def score_leads():
     those dates instead.
     """
     midnight = datetime.combine(datetime.today(), time.min)
-    default_start = (midnight - timedelta(days=21)).strftime(DATE_FMT)
+    default_start = (midnight - timedelta(days=14)).strftime(DATE_FMT)
     default_end = midnight.strftime(DATE_FMT)
 
     payload = request.get_json() or {}
@@ -76,5 +76,3 @@ def train_model():
                          args=(start_date, end_date, flask_config))
     t.start()
     return jsonify(status="Retraining")
-
-

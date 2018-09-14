@@ -306,7 +306,7 @@ def make_tasks_dataset(tasks_data, opps_data, training=True):
     return X_opps_tasks, Y_opps_tasks
 
 
-def make_leads_dataset(salesforce_data, training=True):
+def make_leads_dataset(salesforce_data):
     """Transforms data for salesforce for model
 
     :return: SalesForce dataframe

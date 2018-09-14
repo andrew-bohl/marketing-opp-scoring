@@ -20,6 +20,8 @@ class BaseConfig(object):
     SALESFORCE_TABLE = os.getenv("SALESFORCE_TABLE", 'v1v2_leads_opps')
     TRIAL_CONVERSION_TABLE = os.getenv("TRIAL_CONVERSION_TABLE", 'trial_conversions')
     GA_SESSIONS = os.getenv("GA_SESSIONS_TABLE", 'ga_customer_paths')
+
+    OPPSCORING_TABLE = os.getenv("OPPSCORING_TABLE")
     BQ_INSERT_BATCH_SIZE = 500
 
     BUCKET_NAME = 'marketing-opp-scoring'
@@ -29,6 +31,3 @@ class BaseConfig(object):
     OUTPUTS_PATH = 'outputs/'
     """ TEST CONFIG E.G CUT OFF DATES FOR TESTING """
     TEST_CUTOFF = dt.datetime(2018, 2, 1)
-
-
-
