@@ -8,7 +8,6 @@ import math
 import os
 import pickle
 
-
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.externals import joblib
@@ -64,7 +63,6 @@ class Model(object):
             self.config["OUTPUTS_PATH"]
         )
 
-
         salesforce_data = clean_data.clean_ga_data(
             bq_client,
             salesforce_query,
@@ -80,6 +78,7 @@ class Model(object):
         admin_data = clean_data.clean_admin_data(
             bq_client,
             admin_pv_query,
+
             self.config["OUTPUTS_PATH"]
         )
 
@@ -302,7 +301,6 @@ def create_ensemble_features(models_list, dataset, master_ids, training=True):
         return ensemble_feats, y_true, ids
     else:
         return ensemble_feats, y_true, ids, feature_sets
-
 
 
 def main():

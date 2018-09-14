@@ -76,3 +76,5 @@ def train_model():
                          args=(start_date, end_date, flask_config))
     t.start()
     return jsonify(status="Retraining")
+
+
