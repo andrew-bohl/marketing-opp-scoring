@@ -35,6 +35,7 @@ def score_leads():
     default_end = midnight.strftime(DATE_FMT)
 
     payload = request.get_json() or {}
+
     start_date = _format_date(payload, "start_date", default_start)
     end_date = _format_date(payload, "end_date", default_end)
     flask_config = current_app.config
@@ -60,7 +61,6 @@ def train_model():
     called via a POST request with valid start_date and end_dates, we'll use
     those dates instead.
     """
-
     midnight = datetime.combine(datetime.today(), time.min)
     default_start = (midnight - timedelta(days=210)).strftime(DATE_FMT)
     default_end = (midnight - timedelta(days=21)).strftime(DATE_FMT)

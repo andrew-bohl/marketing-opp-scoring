@@ -23,6 +23,15 @@ class TestApp(unittest.TestCase):
         log.info(payload)
         self.assertEqual((start_date_dt, end_date_dt), (start, end))
 
+    def test_api_train(self):
+        date_format = "%Y-%m-%d"
+        start_date_string = '2018-08-01'
+        end_date_string = '2018-08-02'
+        payload = {'start_date': start_date_string,
+                   'end_date': end_date_string}
+        src.api.score_leads
+
+
 
 if __name__ == '__main__':
     unittest.main()

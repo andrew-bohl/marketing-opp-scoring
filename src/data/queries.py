@@ -89,6 +89,7 @@ class QueryLogic(object):
 
     SFTASKS_QUERY = '''
     SELECT 
+        DISTINCT
         task_id, 
         lead_id, 
         opportunity_id, 
@@ -110,7 +111,7 @@ class QueryLogic(object):
         ringdna__Call_Duration_min__c, 
         ringdna__Queue_Hold_Time__c 
     FROM `v1-dev-main.LeadScoring.vw_tasks` 
-    WHERE lead_createdate >= '{}' and lead_createdate <= '{}'    
+    WHERE lead_createddate >= '{}' and lead_createddate <= '{}'    
     '''
 
 

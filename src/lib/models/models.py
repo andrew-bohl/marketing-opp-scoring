@@ -8,7 +8,6 @@ import math
 import os
 import pickle
 
-import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.externals import joblib
 from sklearn.linear_model import LogisticRegression
@@ -197,17 +196,15 @@ class Model(object):
                                                          save_weights_only=True,
                                                          period=100,
                                                          verbose=1)
-        history = ensembler.fit(np.array(feature_set), np.array(y_true),
-                                epochs=training_epoch, validation_split=0.2,
-                                verbose=0, callbacks=[cp_callback])
+        ensembler.fit(np.array(feature_set), np.array(y_true),
+                      epochs=training_epoch, validation_split=0.2,
+                      verbose=0, callbacks=[cp_callback])
 
         ensembler.save(self.config["OUTPUTS_PATH"] + '/ensemble_model/ensembleNN_model_' + str(self.today) + '.h5')
         ensembler.save_weights(self.config["OUTPUTS_PATH"] + '/ensemble_model/ensembleNN_weights_' + str(self.today) + '.h5')
         self.ensembler = ensembler
 
-        return history
-
-    def evaluate_model(self, test_set, train_set, history):
+    def evaluate_model(self, test_set, train_set):
         """Generate model evaluation metrics
 
         :param test_set: properly formatted test feature set
@@ -215,20 +212,6 @@ class Model(object):
         :param history: tensor flow training history
         :return: evaluation metrics saved a pickle
         """
-
-        def plot_history(history, outputpath, model_date):
-            fig = plt.figure()
-            plt.xlabel('Epoch')
-            plt.ylabel('Mean Abs Error')
-            plt.plot(history.epoch, np.array(history.history['mean_absolute_error']),
-                     label='Train Loss')
-            plt.plot(history.epoch, np.array(history.history['val_mean_absolute_error']), alpha=0.5,
-                     label='Val loss')
-            plt.legend()
-            plt.tight_layout()
-            fig.savefig(outputpath + '/model_training_loss_' + str(model_date)+'.png')
-
-        plot_history(history, self.config["OUTPUTS_PATH"], self.today)
         x_test, y_test = test_set[0], test_set[1]
         x_train, y_train = train_set[0], train_set[1]
 

@@ -2,9 +2,7 @@
     Loads and preps data for modeling
 """
 import datetime as dt
-import logging as log
 
-import numpy as np
 import pandas as pd
 import urllib.parse as url
 
@@ -140,9 +138,6 @@ def clean_opps_data(client, sql, output_path):
     """
     opps_data = utils.load_bigquery_data(client, sql)
     opps_data['lead_createdate'] = pd.to_datetime(opps_data['lead_createdate'])
-    opps_data = opps_data[dt.datetime.today() - opps_data['lead_createdate'] >= dt.timedelta(days=21)].sort_values(
-        'lead_createdate', ascending=False)
-
     opps_data.to_csv(output_path + "opps_data_" + str(date_suffix) + ".csv")
     return opps_data
 
@@ -152,7 +147,6 @@ def clean_leads_data(client, sql, output_path):
 
     :return: SalesForce dataframe
     """
-
     def parse_industries(dataframe):
         i_list = []
         for x in dataframe['industry__c'].unique():
@@ -189,9 +183,9 @@ def clean_leads_data(client, sql, output_path):
     # create hour of day feature
     salesforce_data["hour_of_day"] = salesforce_data["lead_createdate"].apply(lambda x: x.hour)
 
-    leadowners = salesforce_data[['Lead_Owner_Full_Name__c']].apply(pd.value_counts) \
-        .sort_values('Lead_Owner_Full_Name__c', ascending=False).reset_index().head(30)['index'].tolist()
-    salesforce_data['leadowners_2'] = salesforce_data['Lead_Owner_Full_Name__c'] \
+    leadowners = salesforce_data[['lead_owner_full_name__c']].apply(pd.value_counts) \
+        .sort_values('lead_owner_full_name__c', ascending=False).reset_index().head(30)['index'].tolist()
+    salesforce_data['leadowners_2'] = salesforce_data['lead_owner_full_name__c'] \
         .apply(lambda x: x if x in leadowners else 'Other')
 
     salesforce_data['created_date_dt'] = salesforce_data['lead_createdate'].apply(lambda x: x.date())
@@ -221,10 +215,12 @@ def make_admin_dataset(admin_data, opps_data, training=True):
     opps_admin = opps_admin.join(pd.get_dummies(opps_admin['version']))
     opps_admin['cut_off'] = opps_admin['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
     opps_admin['opp_createdate'] = pd.to_datetime(opps_admin[opps_admin['opp_createdate'].notnull()]['opp_createdate'])
+    opps_admin['opp_createdate'] = opps_admin['opp_createdate'].apply(lambda x: x.date())
+
     opps_admin['inserted_at_date'] = opps_admin['inserted_at'].apply(lambda x: x.date())
 
     if training:
-        opps_admin['cut_off'] = opps_admin['opp_createdate'].combine_first(opps_admin['cut_off']).apply(lambda x: x.date())
+        opps_admin['cut_off'] = opps_admin['opp_createdate'].combine_first(opps_admin['cut_off'])
         opps_admin = opps_admin[opps_admin['inserted_at_date'] <= opps_admin['cut_off']]
 
     opps_mdl_data = opps_admin.groupby('trial_order_detail_id').sum()
@@ -256,14 +252,12 @@ def make_v2click_dataset(v2_clicks_data, opps_data, training=True):
                              right_on='tenantId',
                              how='inner')
 
-    opps_v2clicks['opp_createdate'] = pd.to_datetime(
-        opps_v2clicks[opps_v2clicks['opp_createdate'].notnull()]['opp_createdate'])
+    opps_v2clicks['opp_createdate'] = pd.to_datetime(opps_v2clicks[opps_v2clicks['opp_createdate'].notnull()]['opp_createdate'])
     opps_v2clicks['inserted_at_date'] = opps_v2clicks['inserted_at'].apply(lambda x: x.date())
 
     if training:
         opps_v2clicks['cut_off'] = opps_v2clicks['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
-        opps_v2clicks['cut_off'] = opps_v2clicks['opp_createdate'].combine_first(opps_v2clicks['cut_off'])\
-            .apply(lambda x: x.date())
+        opps_v2clicks['cut_off'] = opps_v2clicks['opp_createdate'].combine_first(opps_v2clicks['cut_off'])
         opps_v2clicks = opps_v2clicks[opps_v2clicks['inserted_at_date'] <= opps_v2clicks['cut_off']]
 
     opps_v2clicks = opps_v2clicks.groupby('trial_order_detail_id').sum().reset_index()
@@ -288,9 +282,7 @@ def make_tasks_dataset(tasks_data, opps_data, training=True):
     tasks_data_opps['ActivityDate'] = pd.to_datetime(tasks_data_opps['ActivityDate']).apply(lambda x: x.date())
 
     if training:
-        tasks_data_opps['cut_off'] = tasks_data_opps['opp_createdate'].combine_first(tasks_data_opps['cut_off'])\
-            .apply(lambda x: x.date())
-
+        tasks_data_opps['cut_off'] = tasks_data_opps['opp_createdate'].combine_first(tasks_data_opps['cut_off']).apply(lambda x: x.date())
         tasks_data_opps = tasks_data_opps[tasks_data_opps['ActivityDate'] <= tasks_data_opps['cut_off']]
 
     tasks_data_opps = tasks_data_opps.groupby('trial_id').sum().reset_index()
@@ -350,6 +342,7 @@ def make_ga_dataset(ga_paths, opps_data, training=True):
 
     opps_paths = pd.merge(ga_paths, opps_data, left_on='demo_lookup', right_on='trial_order_detail_id')
     opps_paths['opp_createdate'] = pd.to_datetime(opps_paths['opp_createdate'])
+    opps_paths['opp_createdate'] = opps_paths['opp_createdate'].apply(lambda x: x.date())
     opps_paths['date'] = pd.to_datetime(opps_paths['date']).apply(lambda x: x.date())
 
     if training:

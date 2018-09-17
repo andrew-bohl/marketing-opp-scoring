@@ -129,8 +129,7 @@ def load_gcs_model(bucket, model_name=None, foldername='ensemble_model'):
             ensembler = load_model(ensemble_model[i])
 
         if len(logreg_models) != 5:
-            log.info("Incorrect number of models, found:{}".format{len(logreg_models)})
-
+            log.info("Incorrect number of models, found:{}".format(len(logreg_models)))
     return logreg_models, ensembler, str(np.max(model_dates))
 
 def get_percentile_groups(scores):
@@ -142,14 +141,17 @@ def get_percentile_groups(scores):
     best = np.percentile(scores, 66)
     return good, best
 
+
 def standardize_columns(dataframe):
     dataframe.columns = [x.lower() for x in dataframe.columns]
     return dataframe
+
 
 def filter_data(filter, DataFrame):
     """filters dataframe"""
     data = DataFrame[~(DataFrame[filter.name].isin(filter.filters))]
     return data
+
 
 def convert_cols_to_datetime(dataframe):
     """converts date columns to datetime
