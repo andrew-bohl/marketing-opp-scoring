@@ -17,16 +17,13 @@ pycodestyle = "*"
 scikit-learn = {extras = ["alldeps"]}
 simple-salesforce = "*"
 nose = "*"
-service_identity = "*"
+service-identity = "*"
 pytest = "*"
 pytest-cov = "*"
 mock = "*"
 pandas = "*"
-update = "*"
-tensorflow = "==1.10"
-Keras = "*"
-"h5py" = "*"
-Cython = "*"
+google-cloud-bigquery = "*"
+google-cloud-storage = "*"
 
 [dev-packages]
 

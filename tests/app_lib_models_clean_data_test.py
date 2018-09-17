@@ -43,8 +43,6 @@ class CleanDataTests(unittest.TestCase):
         self.table_name = self.config["SALESFORCE_TABLE"]
         self.relative_path = os.path.dirname(__file__)
 
-        self.opps_data = None
-
         bq_client = bq.BigQueryClient(self.gcp_project,
                                       self.dataset,
                                       self.table_name,
@@ -70,7 +68,7 @@ class CleanDataTests(unittest.TestCase):
 
         ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query, "")
         len_of_data = len(ga_data)
-        expected_val = 5333
+        expected_val = 5339
         print(len_of_data)
 
         self.assertEqual(expected_val, len_of_data,
@@ -80,6 +78,7 @@ class CleanDataTests(unittest.TestCase):
     def test_clean_admin(self):
         """tests clean_ga_data method returns expected dataframe"""
         admin_data = clean_data.clean_admin_data(self.bq_client, self.admin_pv_query, "")
+
         len_of_data = len(admin_data)
         expected_val = 66225
         print(len_of_data)
@@ -112,7 +111,6 @@ class CleanDataTests(unittest.TestCase):
 
     def test_clean_opps(self):
         opps_data = clean_data.clean_opps_data(self.bq_client, self.opps_query, "")
-        self.opps_data = opps_data
         len_of_data = len(opps_data)
         expected_val = 1060
         print(len_of_data)
@@ -124,13 +122,14 @@ class CleanDataTests(unittest.TestCase):
     def test_make_admin_data(self):
         """test make_admin_dataset method returns expected dataframe"""
         admin_data = clean_data.clean_admin_data(self.bq_client, self.admin_pv_query, "")
-        X_opps_admin, Y_opps_admin = clean_data.make_admin_dataset(admin_data, self.opps_data)
+        opps_data = clean_data.clean_opps_data(self.bq_client, self.opps_query, "")
+        X_opps_admin, Y_opps_admin = clean_data.make_admin_dataset(admin_data, opps_data)
 
         len_of_data = len(X_opps_admin)
-        expected_val = 3867
+        expected_val = 758
 
-        num_converted = np.sum(Y_opps_admin)
-        num_converted_exp = 231
+        num_converted = np.sum(Y_opps_admin[:, 0])
+        num_converted_exp = 294
         print(len_of_data)
 
         self.assertEqual(expected_val, len_of_data,
@@ -144,14 +143,15 @@ class CleanDataTests(unittest.TestCase):
     def test_make_v2clicks_data(self):
         """test make_admin_dataset method returns expected dataframe"""
         v2clicks_data = clean_data.clean_v2clicks_data(self.bq_client, self.v2clicks_query, "")
-        X_opps_clicks, Y_opps_clicks= clean_data.make_v2click_dataset(v2clicks_data, self.opps_data)
+        opps_data = clean_data.clean_opps_data(self.bq_client, self.opps_query, "")
+
+        X_opps_clicks, Y_opps_clicks= clean_data.make_v2click_dataset(v2clicks_data, opps_data)
 
         len_of_data = len(X_opps_clicks)
-        expected_val = 3867
+        expected_val = 392
 
-        num_converted = np.sum(Y_opps_clicks)
-        num_converted_exp = 231
-        print(len_of_data)
+        num_converted = np.sum(Y_opps_clicks[:, 0])
+        num_converted_exp = 177
 
         self.assertEqual(expected_val, len_of_data,
                          msg="After cleaning data,\
@@ -164,15 +164,15 @@ class CleanDataTests(unittest.TestCase):
     def test_make_ga_data(self):
         """test make_admin_dataset method returns expected dataframe"""
         ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query, "")
-        X_opps_ga, Y_opps_clicks= clean_data.make_ga_dataset(ga_data, self.opps_data)
+        opps_data = clean_data.clean_opps_data(self.bq_client, self.opps_query, "")
+
+        X_opps_ga, Y_opps_ga= clean_data.make_ga_dataset(ga_data, opps_data)
 
         len_of_data = len(X_opps_ga)
-        expected_val = 3867
+        expected_val = 1436
 
-        num_converted = np.sum(Y_opps_clicks)
-        num_converted_exp = 231
-        np.sum()
-        print(len_of_data)
+        num_converted = np.sum(Y_opps_ga[:, 0])
+        num_converted_exp = 633
 
         self.assertEqual(expected_val, len_of_data,
                          msg="After cleaning data,\
@@ -182,55 +182,46 @@ class CleanDataTests(unittest.TestCase):
                          msg="After cleaning data,\
                           expected {} got {}".format(num_converted_exp, num_converted))
 
+    def test_make_leads_data(self):
+        """test make_leads_dataset method returns expected dataframe"""
+        leads_data = clean_data.clean_leads_data(self.bq_client, self.salesforce_query, "")
 
+        X_opps_leads, Y_opps_leads = clean_data.make_leads_dataset(leads_data)
 
-    # def test_merge_datasets(self):
-    #     """tests merge data returns expected dataframe"""
-    #
-    #     salesforce_data = clean_data.clean_salesforce_data(self.bq_client, self.salesforce_query)
-    #     ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query)
-    #
-    #     dataset = [salesforce_data, ga_data]
-    #     final_data = clean_data.merge_datasets(dataset, self.start_date, self.end_date, True)
-    #     final_data_open = clean_data.merge_datasets(dataset, self.start_date, self.end_date, False)
-    #
-    #     len_final_data = len(final_data)
-    #     len_final_data_open = len(final_data_open)
-    #
-    #     exp_val_data = 4613
-    #     exp_val_data_open = 4424
-    #
-    #     self.assertEqual(exp_val_data, len_final_data,
-    #                      msg="After merging data,\
-    #                       expected {}. Got {}".format(exp_val_data, len_final_data))
-    #
-    #     self.assertEqual(exp_val_data_open, len_final_data_open,
-    #                      msg="After merging data with open status,\
-    #                       expected {}. Got {}".format(exp_val_data_open, len_final_data_open))
-    #
-    # def test_create_features(self):
-    #     """tests create_feature function returns expected number of features and observations"""
-    #
-    #     salesforce_data = clean_data.clean_salesforce_data(self.bq_client, self.salesforce_query)
-    #     ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query)
-    #
-    #     dataset = [salesforce_data, ga_data]
-    #     final_data = clean_data.merge_datasets(dataset, self.start_date, self.end_date, True)
-    #     features_names, target_variable, _, _ = clean_data.create_features(final_data)
-    #
-    #     feature_num = len(features_names)
-    #     obs_count = len(target_variable)
-    #
-    #     exp_feat_num = 1557
-    #     exp_obs_count = 4614
-    #
-    #     self.assertEqual(exp_feat_num, feature_num,
-    #                      msg="After creating features,\
-    #                       expected {} features. Got {}".format(exp_feat_num, feature_num))
-    #
-    #     self.assertEqual(exp_obs_count, obs_count,
-    #                      msg="After creating features,\
-    #                       expected {} observations. Got {}".format(exp_obs_count, obs_count))
+        len_of_data = len(X_opps_leads)
+        expected_val = 883
+
+        num_converted = np.sum(Y_opps_leads[:, 0])
+        num_converted_exp = 177
+
+        self.assertEqual(expected_val, len_of_data,
+                         msg="After cleaning data,\
+                          expected {} got {}".format(expected_val, len_of_data))
+
+        self.assertEqual(num_converted_exp, num_converted,
+                         msg="After cleaning data,\
+                          expected {} got {}".format(num_converted_exp, num_converted))
+
+    def test_make_tasks_data(self):
+        """tests make_tasks_dataset method returns expected dataset"""
+        tasks_data = clean_data.clean_tasks_data(self.bq_client, self.tasks_query, "")
+        opps_data = clean_data.clean_opps_data(self.bq_client, self.opps_query, "")
+
+        X_opps_task, Y_opps_task= clean_data.make_tasks_dataset(tasks_data, opps_data)
+
+        len_of_data = len(X_opps_task)
+        expected_val = 82
+
+        num_converted = np.sum(Y_opps_task[:, 0])
+        num_converted_exp = 24
+
+        self.assertEqual(expected_val, len_of_data,
+                         msg="After cleaning data,\
+                          expected {} got {}".format(expected_val, len_of_data))
+
+        self.assertEqual(num_converted_exp, num_converted,
+                         msg="After cleaning data,\
+                          expected {} got {}".format(num_converted_exp, num_converted))
 
 
 if __name__ == '__main__':

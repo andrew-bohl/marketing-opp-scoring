@@ -253,6 +253,8 @@ def make_v2click_dataset(v2_clicks_data, opps_data, training=True):
                              how='inner')
 
     opps_v2clicks['opp_createdate'] = pd.to_datetime(opps_v2clicks[opps_v2clicks['opp_createdate'].notnull()]['opp_createdate'])
+    opps_v2clicks['opp_createdate'] = opps_v2clicks['opp_createdate'].apply(lambda x: x.date())
+
     opps_v2clicks['inserted_at_date'] = opps_v2clicks['inserted_at'].apply(lambda x: x.date())
 
     if training:
@@ -278,11 +280,11 @@ def make_tasks_dataset(tasks_data, opps_data, training=True):
     tasks_data_opps = pd.merge(opps_data, tasks_data, left_on='trial_order_detail_id', right_on='trial_id', how='inner')
 
     tasks_data_opps['cut_off'] = tasks_data_opps['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
-    tasks_data_opps['opp_createdate'] = pd.to_datetime(tasks_data_opps['opp_createdate'])
+    tasks_data_opps['opp_createdate'] = pd.to_datetime(tasks_data_opps['opp_createdate']).apply(lambda x: x.date())
     tasks_data_opps['ActivityDate'] = pd.to_datetime(tasks_data_opps['ActivityDate']).apply(lambda x: x.date())
 
     if training:
-        tasks_data_opps['cut_off'] = tasks_data_opps['opp_createdate'].combine_first(tasks_data_opps['cut_off']).apply(lambda x: x.date())
+        tasks_data_opps['cut_off'] = tasks_data_opps['opp_createdate'].combine_first(tasks_data_opps['cut_off'])
         tasks_data_opps = tasks_data_opps[tasks_data_opps['ActivityDate'] <= tasks_data_opps['cut_off']]
 
     tasks_data_opps = tasks_data_opps.groupby('trial_id').sum().reset_index()
@@ -314,7 +316,7 @@ def make_leads_dataset(salesforce_data):
         return i_list
 
     industry_list = parse_industries(salesforce_data)
-    dummies_col_lts = ['lead_type_2', 'leadsource', 'leadowners_2', 'Device_Type__c', 'Gender__c', 'Position__c',
+    dummies_col_lts = ['lead_type_2', 'leadsource', 'leadowners_2', 'device_type__c', 'gender__c', 'position__c',
                        'country_2']
 
     cols = []
@@ -332,7 +334,7 @@ def make_leads_dataset(salesforce_data):
             salesforce_data[feat_set[2:]].max() - salesforce_data[feat_set[2:]].min())
 
     X_opps_sf = opps_norm.values
-    Y_opps_sf = opps_norm[['converted_to_opp', 'trial_order_detail_id']].values
+    Y_opps_sf = salesforce_data[['converted_to_opp', 'trial_order_detail_id']].values
 
     return X_opps_sf, Y_opps_sf
 
@@ -347,8 +349,7 @@ def make_ga_dataset(ga_paths, opps_data, training=True):
 
     if training:
         opps_paths['cut_off'] = opps_paths['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
-        opps_paths['cut_off'] = opps_paths['opp_createdate'].combine_first(opps_paths['cut_off'])\
-            .apply(lambda x: x.date())
+        opps_paths['cut_off'] = opps_paths['opp_createdate'].combine_first(opps_paths['cut_off'])
         opps_paths = opps_paths[opps_paths['date'] <= opps_paths['cut_off']]
 
     cols = ['trial_order_detail_id', 'converted_to_opp', 'non_brand']

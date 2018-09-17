@@ -21,12 +21,16 @@ class ModelTests(unittest.TestCase):
         if not os.path.exists(output_path):
             os.makedirs(output_path)
 
-        self.start_date = dt(2017, 7, 1).date()
-        self.end_date = dt(2018, 2, 1).date()
+        self.start_date = dt(2017, 8, 1).date()
+        self.end_date = dt(2018, 8, 4).date()
 
-        salesforce_data, ga_paths = self.model.load_data(self.start_date, self.end_date)
+        opps_data, ga_paths, tasks_data, v2_clicks_data, admin_data, salesforce_data = self.model.load_data(self.start_date, self.end_date)
         self.salesforce = salesforce_data
         self.ga_data = ga_paths
+        self.opps_data = opps_data
+        self.tasks_data = tasks_data
+        self.v2_clicks_data = v2_clicks_data
+        self.admin_data = admin_data
 
     def test_load_data(self):
         """Tests load data function is generating approx size data"""
