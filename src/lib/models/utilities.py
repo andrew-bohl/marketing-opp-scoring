@@ -88,7 +88,7 @@ def writeall_gcs_files(gcs_client, bucket_name, filepath='.'):
         write_gcs_file(bucket, os.path.join(filepath, file), file)
 
 
-def load_gcs_model(bucket, model_name=None, foldername='ensemble_model'):
+def load_gcs_model(bucket, model_name=None, foldername=''):
     """ Loads datafiles for data creation and returns a pandas dataframe
 
     :param bucket: gcs bucket
@@ -104,12 +104,17 @@ def load_gcs_model(bucket, model_name=None, foldername='ensemble_model'):
         model_dates = []
         ensemble_model = []
         ensemble_dates = []
-        for blob in bucket.list_blobs(prefix='/' + foldername+'/model_'):
+        for blob in bucket.list_blobs(prefix=foldername+'model_'):
+            print(blob)
             model_names.append(blob.name)
-            model_dates.append(int(blob.name[11:-4].replace('-', '')))
-        for blob in bucket.list_blobs(prefix='/' + foldername+'/ensembleNN_model_'):
+            model_dates.append(int(blob.name[-14:][:-4].replace('-', '')))
+        for blob in bucket.list_blobs(prefix=foldername+'ensembleNN_model_'):
+            print(blob)
             ensemble_model.append(blob.name)
-            ensemble_dates.append(int(blob.name[11:-3].replace('-', '')))
+            ensemble_dates.append(int(blob.name[17:-3].replace('-', '')))
+
+        print(ensemble_model)
+        print(model_names)
 
         model_ix = [i for i in range(len(model_dates)) if np.max(model_dates) == model_dates[i]]
         ensemble_ix = [i for i in range(len(ensemble_dates)) if np.max(ensemble_dates) == ensemble_dates[i]]
@@ -121,7 +126,7 @@ def load_gcs_model(bucket, model_name=None, foldername='ensemble_model'):
             download_blob(bucket, model_names[i], foldername)
             model = joblib.load(model_names[i])
             for m_name in model_keys.values():
-                if model_names[i].str.find(m_name) >= 0:
+                if model_names[i].find(m_name) >= 0:
                     logreg_models[m_name] = model
 
         for i in ensemble_ix:
@@ -131,6 +136,7 @@ def load_gcs_model(bucket, model_name=None, foldername='ensemble_model'):
         if len(logreg_models) != 5:
             log.info("Incorrect number of models, found:{}".format(len(logreg_models)))
     return logreg_models, ensembler, str(np.max(model_dates))
+
 
 def get_percentile_groups(scores):
     """Calculate percentiles for scores

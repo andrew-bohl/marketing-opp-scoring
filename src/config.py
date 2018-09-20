@@ -25,7 +25,7 @@ class BaseConfig(object):
     BQ_INSERT_BATCH_SIZE = 500
 
     BUCKET_NAME = 'marketing-opp-scoring'
-    GCS_FOLDER = None
+    GCS_FOLDER = ''
     MODEL_NAME = None
 
     OUTPUTS_PATH = 'outputs/'

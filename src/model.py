@@ -24,30 +24,32 @@ def train(start_date, end_date, flask_config):
     current_model = models.Model(flask_config)
     output_path = current_model.config["OUTPUTS_PATH"]
 
+    ensemble_path = current_model.config["OUTPUTS_PATH"] + 'ensemble_model/'
+
     if not os.path.exists(output_path):
         os.makedirs(output_path)
 
-    ids_set, datasets = current_model.create_model_data(start_date.date(), end_date.date(), True)
+    if not os.path.exists(ensemble_path):
+        os.makedirs(ensemble_path)
+
+    ids_set, datasets, feat_names, _ = current_model.create_model_data((start_date.date(), end_date.date()), training=True)
     current_model.split_dataset(ids_set, datasets)
 
     training_data = current_model.train_set
     testing_data = current_model.test_set
 
-    current_model.create_logreg_models(training_data)
-    model_list = current_model.models
+    current_model.create_logreg_models(training_data, feat_names)
 
-    train_features, train_y, _ = current_model.create_ensemble_features(model_list, training_data, ids_set)
-    test_features, test_y, _ = current_model.create_ensemble_features(model_list, testing_data, ids_set)
+    train_features, train_y, _, _ = current_model.create_ensemble_features(training_data, ids_set)
+    test_features, test_y, _, _ = current_model.create_ensemble_features(testing_data, ids_set)
 
     train_history = current_model.train_model(train_features, train_y)
-    current_model.evaluate_model((test_features, test_y), (train_features, train_y), train_history)
-
-    testing_data = current_model.test_set
-    current_model.evaluate_model(testing_data, training_data)
+    current_model.evaluate_model((test_features, test_y), (train_features, train_y))
 
     bucket_name = current_model.config["BUCKET_NAME"]
     gcs = storage.Client.from_service_account_json('src/credentials/leadscoring.json')
     util.writeall_gcs_files(gcs, bucket_name, output_path)
+    util.writeall_gcs_files(gcs, bucket_name, output_path+'ensemble_model/')
 
 
 def infer(start_date, end_date, flask_config):
@@ -67,24 +69,32 @@ def infer(start_date, end_date, flask_config):
 
     bucket = util.initialize_gcs(gcs, config["BUCKET_NAME"])
     logreg_models, ensembler, model_date = util.load_gcs_model(bucket, config["MODEL_NAME"], config["GCS_FOLDER"])
-
     year, month, date = int(model_date[:4]), int(model_date[4:6]), int(model_date[6:])
     model_date = dt(year, month, date)
+
+    # except TypeError:
+    #     model_date = dt(1900, 1, 1)
 
     if (dt.today() - model_date) <= timedelta(days=30):
         # use imported model
         current_model.models = logreg_models
         current_model.ensembler = ensembler
-        ids_set, datasets, lead_lookup = current_model.create_model_data(start_date.date(), end_date.date(), False)
-        features, opp_values, trial_ids, feature_sets = models.create_ensemble_features(logreg_models, datasets,
-                                                                                        ids_set, training=False)
+        date_range = (start_date, end_date)
+        features = {}
+        for model_name in logreg_models.keys():
+            features[model_name] = logreg_models[model_name].features_names
+
+        ids_set, datasets, features, lead_lookup = current_model.create_model_data(date_range, features, training=False)
+        ensemble_features, opp_values, trial_ids, feature_sets = current_model.create_ensemble_features(datasets, ids_set)
 
         opp_values = np.array([1 if y else 0 for y in opp_values])
-        features = np.array(features)
+        ensemble_features = np.array(ensemble_features)
+        print("ensemble shape \n\n")
+        print(ensemble_features.shape)
         trial_ids = np.array(trial_ids)
         score_ix = np.where(opp_values == 0)
 
-        ensembler_scores = current_model.ensembler.predict(features)
+        ensembler_scores = current_model.ensembler.predict(ensemble_features)
         good, best = util.get_percentile_groups(ensembler_scores)
 
         records = []

@@ -68,7 +68,7 @@ class CleanDataTests(unittest.TestCase):
 
         ga_data = clean_data.clean_ga_data(self.bq_client, self.ga_query, "")
         len_of_data = len(ga_data)
-        expected_val = 5339
+        expected_val = 5345
         print(len_of_data)
 
         self.assertEqual(expected_val, len_of_data,

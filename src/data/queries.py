@@ -26,7 +26,7 @@ class QueryLogic(object):
         country, 
         Status, 
         lead_createdate, 
-        converted_to_opp, 
+        CASE WHEN converted_to_opp IS TRUE then 1 else 0 END as converted_to_opp, 
         opp_createdate, 
         opp_iswon, 
         opp_CloseDate
@@ -40,7 +40,7 @@ class QueryLogic(object):
         leadsource,
         lead_createdate,
         trial_order_detail_id,
-        converted_to_opp, 
+        CASE WHEN converted_to_opp IS TRUE then 1 else 0 END as converted_to_opp, 
         opp_createdate
     FROM `v1-dev-main.LeadScoring.v1v2_leads_opps`
     WHERE lead_createdate >= '{}' and lead_createdate <= '{}'
@@ -147,6 +147,17 @@ class QueryLogic(object):
         demo_session_position
     FROM `v1-dev-main.LeadScoring.ga_customer_paths`
     WHERE date >= '{}' and date <= '{}'
+    """
+
+    TRIAL_CONV_QUERY = """
+    SELECT 
+        trial_id,
+        trial_date, 
+        sub_id, 
+        sub_date,
+        CASE WHEN sub_id IS NOT NULL THEN 1 else -1 END as converted 
+    FROM `v1-dev-main.LeadScoring.trial_conversions`
+    WHERE trial_date >= '{}' and trial_date <= '{}'
     """
 
     TRIAL_CONV_QUERY = """

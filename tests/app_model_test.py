@@ -21,7 +21,6 @@ class TestModel(unittest.TestCase):
         end_date = dt(2018, 3, 1)
         model.train(start_date, end_date, self.config)
 
-
 if __name__ == '__main__':
     unittest.main()
 

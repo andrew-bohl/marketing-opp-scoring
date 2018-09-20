@@ -13,7 +13,7 @@ import src.lib.models.utilities as utils
 date_suffix = dt.datetime.combine(dt.datetime.today(), dt.time.min).date().isoformat()
 
 
-def clean_admin_data(client, sql, output_path):
+def clean_admin_data(client, sql):
     """Cleans the opportunity conversion data
 
     :param client: BQ client
@@ -36,13 +36,10 @@ def clean_admin_data(client, sql, output_path):
 
     admin_data['url_path_2'] = admin_data['url_path'].apply(lambda x: x if x in top_urls else 'Other')
     admin_data = admin_data.join(pd.get_dummies(admin_data['url_path_2']))
-
-    admin_data.to_csv(output_path + "admin_data_" + str(date_suffix) + ".csv")
-
     return admin_data
 
 
-def clean_v2clicks_data(client, sql, output_path):
+def clean_v2clicks_data(client, sql):
     """Cleans v2clicks data for model
 
     :param client: BQ client
@@ -53,11 +50,11 @@ def clean_v2clicks_data(client, sql, output_path):
     v2_clicks_data = utils.load_bigquery_data(client, sql)
     v2_clicks_data['inserted_at'] = pd.to_datetime(v2_clicks_data['inserted_at'])
     v2_clicks_data = v2_clicks_data.join(pd.get_dummies(v2_clicks_data['action']))
-    v2_clicks_data.to_csv(output_path + "v2_clicks_data_" + str(date_suffix) + ".csv")
+    # v2_clicks_data.to_csv(output_path + "v2_clicks_data_" + str(date_suffix) + ".csv")
     return v2_clicks_data
 
 
-def clean_tasks_data(client, sql, output_path):
+def clean_tasks_data(client, sql):
     """Cleans salesforce tasks data for merging
     :param client: BQ client
     :param sql: sql query
@@ -73,11 +70,10 @@ def clean_tasks_data(client, sql, output_path):
 
     tasks_data = tasks_data.join(pd.get_dummies(tasks_data[['activity_type_2', 'TaskSubtype']]))
     tasks_data['trial_id'] = tasks_data['order_detail_id'].combine_first(tasks_data['tenant_id__c'])
-    tasks_data.to_csv(output_path + "tasks_data_" + str(date_suffix) + ".csv")
     return tasks_data
 
 
-def clean_ga_data(client, sql, output_path):
+def clean_ga_data(client, sql):
     """Transforms data for ga session data
 
     :return: dataframe
@@ -126,23 +122,20 @@ def clean_ga_data(client, sql, output_path):
     ga_paths['non_brand'] = ga_paths['campaign'].apply(lambda x: 1 if x.find('-nbr-') else 0)
     ga_paths['landingpage_class'] = ga_paths['landingpagepath'].apply(landing_page_classification)
     ga_paths['date'] = pd.to_datetime(ga_paths['date'])
-
-    ga_paths.to_csv(output_path + "ga_sessions_" + str(date_suffix) + ".csv")
     return ga_paths
 
 
-def clean_opps_data(client, sql, output_path):
+def clean_opps_data(client, sql):
     """Transforms data for salesforce
 
     :return: SalesForce dataframe
     """
     opps_data = utils.load_bigquery_data(client, sql)
     opps_data['lead_createdate'] = pd.to_datetime(opps_data['lead_createdate'])
-    opps_data.to_csv(output_path + "opps_data_" + str(date_suffix) + ".csv")
     return opps_data
 
 
-def clean_leads_data(client, sql, output_path):
+def clean_leads_data(client, sql):
     """Clean salesforce data for model
 
     :return: SalesForce dataframe
@@ -202,18 +195,15 @@ def clean_leads_data(client, sql, output_path):
         .sort_values(ascending=False).head(10).reset_index()['lead_type__c'].tolist()
     salesforce_data['lead_type_2'] = salesforce_data['lead_type__c'] \
         .apply(lambda x: x if x in lead_types_list else 'Other')
-
-    salesforce_data.to_csv(output_path + "salesforce_" + str(date_suffix) + ".csv")
-
     return salesforce_data
 
 
-def make_admin_dataset(admin_data, opps_data, training=True):
+def make_admin_dataset(dataset, feature_names=None, training=True):
     """Creates the feature set for the first model"""
-
+    admin_data, opps_data = dataset[0], dataset[1]
     opps_admin = pd.merge(opps_data, admin_data, left_on='trial_order_detail_id', right_on='u_id', how='inner')
     opps_admin = opps_admin.join(pd.get_dummies(opps_admin['version']))
-    opps_admin['cut_off'] = opps_admin['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
+    opps_admin['cut_off'] = opps_admin['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=21))
     opps_admin['opp_createdate'] = pd.to_datetime(opps_admin[opps_admin['opp_createdate'].notnull()]['opp_createdate'])
     opps_admin['opp_createdate'] = opps_admin['opp_createdate'].apply(lambda x: x.date())
 
@@ -224,7 +214,9 @@ def make_admin_dataset(admin_data, opps_data, training=True):
         opps_admin = opps_admin[opps_admin['inserted_at_date'] <= opps_admin['cut_off']]
 
     opps_mdl_data = opps_admin.groupby('trial_order_detail_id').sum()
+
     opps_mdl_data['converted_to_opp'] = opps_mdl_data['converted_to_opp'].apply(lambda x: 1 if x > 0 else 0)
+
     opps_mdl_data['v1'] = opps_mdl_data['v1'].apply(lambda x: 1 if x > 0 else 0)
     opps_mdl_data['v2'] = opps_mdl_data['v2'].apply(lambda x: 1 if x > 0 else 0)
 
@@ -235,18 +227,31 @@ def make_admin_dataset(admin_data, opps_data, training=True):
 
     opps_mdl_data = opps_mdl_data[top_urls].reset_index()
     opps_mdl_data = opps_mdl_data.fillna(0)
-    opps_mdl_data_norm = (opps_mdl_data[opps_mdl_data.columns[1:-1]] - opps_mdl_data[
-        opps_mdl_data.columns[1:-1]].mean()) / (opps_mdl_data[opps_mdl_data.columns[1:-1]].max()\
-                                                - opps_mdl_data[opps_mdl_data.columns[1:-1]].min())
+
+    if feature_names:
+        for feat in feature_names['admin']:
+            try:
+                opps_mdl_data[feat]
+            except KeyError:
+                opps_mdl_data[feat] = 0.5
+        feat_cols = feature_names['admin']
+        opps_mdl_data_norm = (opps_mdl_data[feat_cols] - opps_mdl_data[feat_cols].mean()) / (
+                opps_mdl_data[feat_cols].max() - opps_mdl_data[feat_cols].min())
+    else:
+        opps_mdl_data_norm = (opps_mdl_data[opps_mdl_data.columns[1:-1]] - opps_mdl_data[
+            opps_mdl_data.columns[1:-1]].mean()) / (opps_mdl_data[opps_mdl_data.columns[1:-1]].max()\
+                                                    - opps_mdl_data[opps_mdl_data.columns[1:-1]].min())
 
     X_opps_admin = opps_mdl_data_norm.values
     Y_opps_admin = opps_mdl_data[['converted_to_opp', 'trial_order_detail_id']].values
-    return X_opps_admin, Y_opps_admin
+
+    return X_opps_admin, Y_opps_admin, opps_mdl_data_norm.columns
 
 
-def make_v2click_dataset(v2_clicks_data, opps_data, training=True):
+def make_v2click_dataset(dataset, feature_names=None, training=True):
     """Make dataset for v2clicks model"""
 
+    v2_clicks_data, opps_data = dataset[0], dataset[1]
     feats = v2_clicks_data['action'].unique().tolist()
     opps_v2clicks = pd.merge(opps_data, v2_clicks_data, left_on='trial_order_detail_id',
                              right_on='tenantId',
@@ -258,28 +263,41 @@ def make_v2click_dataset(v2_clicks_data, opps_data, training=True):
     opps_v2clicks['inserted_at_date'] = opps_v2clicks['inserted_at'].apply(lambda x: x.date())
 
     if training:
-        opps_v2clicks['cut_off'] = opps_v2clicks['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
+        opps_v2clicks['cut_off'] = opps_v2clicks['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=21))
         opps_v2clicks['cut_off'] = opps_v2clicks['opp_createdate'].combine_first(opps_v2clicks['cut_off'])
         opps_v2clicks = opps_v2clicks[opps_v2clicks['inserted_at_date'] <= opps_v2clicks['cut_off']]
 
     opps_v2clicks = opps_v2clicks.groupby('trial_order_detail_id').sum().reset_index()
+
     opps_v2clicks['converted_to_opp'] = opps_v2clicks['converted_to_opp'].apply(lambda x: 1 if x > 0 else 0)
 
-    opps_v2clicks_norm = (opps_v2clicks[feats] - opps_v2clicks[feats].mean()) / (
+    if feature_names:
+        for featx in feature_names['v2clicks']:
+            try:
+                opps_v2clicks[featx]
+            except KeyError:
+                opps_v2clicks[featx] = 0.5
+        feat_cols = feature_names['v2clicks']
+        opps_v2clicks_norm = (opps_v2clicks[feat_cols] - opps_v2clicks[feat_cols].mean()) / (
+                    opps_v2clicks[feat_cols].max() - opps_v2clicks[feat_cols].min())
+    else:
+        opps_v2clicks_norm = (opps_v2clicks[feats] - opps_v2clicks[feats].mean()) / (
                 opps_v2clicks[feats].max() - opps_v2clicks[feats].min())
 
     X_opps_v2clicks = opps_v2clicks_norm.values
     Y_opps_v2clicks = opps_v2clicks[['converted_to_opp', 'trial_order_detail_id']].values
 
-    return X_opps_v2clicks, Y_opps_v2clicks
+    return X_opps_v2clicks, Y_opps_v2clicks, opps_v2clicks_norm.columns
 
 
-def make_tasks_dataset(tasks_data, opps_data, training=True):
+def make_tasks_dataset(dataset, feature_names=None, training=True):
     """make dataset for tasks model"""
 
+    tasks_data, opps_data = dataset[0], dataset[1]
     tasks_data_opps = pd.merge(opps_data, tasks_data, left_on='trial_order_detail_id', right_on='trial_id', how='inner')
 
-    tasks_data_opps['cut_off'] = tasks_data_opps['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
+    tasks_data_opps['lead_createdate'] = pd.to_datetime(tasks_data_opps['lead_createdate'])
+    tasks_data_opps['cut_off'] = tasks_data_opps['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=21))
     tasks_data_opps['opp_createdate'] = pd.to_datetime(tasks_data_opps['opp_createdate']).apply(lambda x: x.date())
     tasks_data_opps['ActivityDate'] = pd.to_datetime(tasks_data_opps['ActivityDate']).apply(lambda x: x.date())
 
@@ -288,19 +306,36 @@ def make_tasks_dataset(tasks_data, opps_data, training=True):
         tasks_data_opps = tasks_data_opps[tasks_data_opps['ActivityDate'] <= tasks_data_opps['cut_off']]
 
     tasks_data_opps = tasks_data_opps.groupby('trial_id').sum().reset_index()
+
     tasks_data_opps['converted_to_opp'] = tasks_data_opps['converted_to_opp'].apply(lambda x: 1 if x > 0 else 0)
     feats = tasks_data_opps.columns
 
-    tasks_data_opps_norm = (tasks_data_opps[feats[2:]] - tasks_data_opps[feats[2:]].mean()) / \
-                           (tasks_data_opps[feats[2:]].max() - tasks_data_opps[feats[2:]].min())
+    for col in feats[2:]:
+        tasks_data_opps[col] = tasks_data_opps[col].fillna(tasks_data_opps[col].mean())
+
+    if feature_names:
+        for feat in feature_names['tasks']:
+            try:
+                tasks_data_opps[feat]
+            except KeyError:
+                tasks_data_opps[feat] = 0.5
+        feat_cols = feature_names['tasks']
+        tasks_data_opps_norm = (tasks_data_opps[feat_cols] - tasks_data_opps[feat_cols].mean()) / \
+                               (tasks_data_opps[feat_cols].max() - tasks_data_opps[feat_cols].min())
+
+    else:
+        tasks_data_opps_norm = (tasks_data_opps[feats[2:]] - tasks_data_opps[feats[2:]].mean()) / \
+                               (tasks_data_opps[feats[2:]].max() - tasks_data_opps[feats[2:]].min())
+
+    tasks_data_opps_norm = tasks_data_opps_norm.fillna(0)
 
     X_opps_tasks = tasks_data_opps_norm.values
     Y_opps_tasks = tasks_data_opps[['converted_to_opp', 'trial_id']].values
 
-    return X_opps_tasks, Y_opps_tasks
+    return X_opps_tasks, Y_opps_tasks, tasks_data_opps_norm.columns
 
 
-def make_leads_dataset(salesforce_data):
+def make_leads_dataset(salesforce_data, feature_names=None):
     """Transforms data for salesforce for model
 
     :return: SalesForce dataframe
@@ -327,20 +362,40 @@ def make_leads_dataset(salesforce_data):
     cols.reverse()
 
     salesforce_data = salesforce_data[cols].join(pd.get_dummies(salesforce_data[dummies_col_lts]))
-    salesforce_data['converted_to_opp'] = salesforce_data['converted_to_opp'].apply(lambda x: 1 if x == 'True' else 0)
+    salesforce_data['converted_to_opp'] = salesforce_data['converted_to_opp'].apply(lambda x: int(x))
 
     feat_set = salesforce_data.columns
-    opps_norm = (salesforce_data[feat_set[2:]] - salesforce_data[feat_set[2:]].mean()) / (
+
+    if feature_names:
+        for feat in feature_names['sf_leads']:
+            try:
+                salesforce_data[feat]
+            except KeyError:
+                salesforce_data[feat] = 0.5
+
+        feat_cols = feature_names['sf_leads']
+        opps_norm = (salesforce_data[feat_cols] - salesforce_data[feat_cols].mean()) / (
+            salesforce_data[feat_cols].max() - salesforce_data[feat_cols].min())
+
+    else:
+        opps_norm = (salesforce_data[feat_set[2:]] - salesforce_data[feat_set[2:]].mean()) / (
             salesforce_data[feat_set[2:]].max() - salesforce_data[feat_set[2:]].min())
+
+    salesforce_data['converted_to_opp'] = salesforce_data['converted_to_opp'].fillna(0)
 
     X_opps_sf = opps_norm.values
     Y_opps_sf = salesforce_data[['converted_to_opp', 'trial_order_detail_id']].values
 
-    return X_opps_sf, Y_opps_sf
+    return X_opps_sf, Y_opps_sf, opps_norm.columns
 
 
-def make_ga_dataset(ga_paths, opps_data, training=True):
-    """Make dataset for GA data model"""
+def make_ga_dataset(dataset, feature_names=None, training=True):
+    """Make dataset for GA data model
+    :param dataset: is a tuple of ga_paths, opps_data
+    :param feature_names: is a list of featurenames
+    :param training: Boolean to filter on a cutoff date"""
+
+    ga_paths, opps_data = dataset[0], dataset[1]
 
     opps_paths = pd.merge(ga_paths, opps_data, left_on='demo_lookup', right_on='trial_order_detail_id')
     opps_paths['opp_createdate'] = pd.to_datetime(opps_paths['opp_createdate'])
@@ -348,18 +403,37 @@ def make_ga_dataset(ga_paths, opps_data, training=True):
     opps_paths['date'] = pd.to_datetime(opps_paths['date']).apply(lambda x: x.date())
 
     if training:
-        opps_paths['cut_off'] = opps_paths['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=14))
+        opps_paths['cut_off'] = opps_paths['lead_createdate'].apply(lambda x: x.date() + dt.timedelta(days=21))
         opps_paths['cut_off'] = opps_paths['opp_createdate'].combine_first(opps_paths['cut_off'])
         opps_paths = opps_paths[opps_paths['date'] <= opps_paths['cut_off']]
 
-    cols = ['trial_order_detail_id', 'converted_to_opp', 'non_brand']
+    cols = ['trial_order_detail_id', 'converted_to_opp']
     feats = ['landingpage_class', 'devicecategory', 'brand_nonbrand', 'landingpagepath_2', 's_version']
     opps_path_feats = opps_paths[cols].join(pd.get_dummies(opps_paths[feats]))
     feat_set = opps_path_feats.columns
-    opps_path_feats_norm = (opps_path_feats[feat_set[2:]] - opps_path_feats[feat_set[2:]].mean()) / (
-                opps_path_feats[feat_set[2:]].max() - opps_path_feats[feat_set[2:]].min())
+
+    for col in feat_set[2:]:
+        opps_path_feats[col] = opps_path_feats[col].fillna(opps_path_feats[col].mean())
+
+    if feature_names:
+        for feat in feature_names['ga']:
+            try:
+                opps_path_feats[feat]
+            except KeyError:
+                opps_path_feats[feat] = 0.5
+        feat_cols = feature_names['ga']
+
+        opps_path_feats_norm = (opps_path_feats[feat_cols] - opps_path_feats[feat_cols].mean()) / (
+                    opps_path_feats[feat_cols].max() - opps_path_feats[feat_cols].min())
+
+    else:
+        opps_path_feats_norm = (opps_path_feats[feat_set[2:]] - opps_path_feats[feat_set[2:]].mean()) / (
+                    opps_path_feats[feat_set[2:]].max() - opps_path_feats[feat_set[2:]].min())
+
+    opps_path_feats['converted_to_opp'] = opps_path_feats['converted_to_opp'].fillna(0)
 
     X_opps_ga = opps_path_feats_norm.values
     Y_opps_ga = opps_path_feats[['converted_to_opp', 'trial_order_detail_id']].values
 
-    return X_opps_ga, Y_opps_ga
+    return X_opps_ga, Y_opps_ga, opps_path_feats_norm.columns
+

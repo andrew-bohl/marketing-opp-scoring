@@ -1,6 +1,9 @@
 SERVICE := marketing_opp_scoring
-BASE_IMAGE := gcr.io/v1-dev-main/datascience-base:python3-alpine
+BASE_IMAGE := gcr.io/v1-dev-main/datascience-base-tf2
 TAG := $(shell date +%Y%m%d-%H%M)
+INCLUDE_DIRS := $(PYTHON_INCLUDE) /usr/local/include /usr/include/hdf5/serial/
+LIBRARY_DIRS := $(PYTHON_LIB) /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu/hdf5/serial/
+
 
 ifeq ($(ENV),)
 $(error ENV needs to be defined. e.g.: make deploy ENV=dev)

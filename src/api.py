@@ -62,7 +62,7 @@ def train_model():
     those dates instead.
     """
     midnight = datetime.combine(datetime.today(), time.min)
-    default_start = (midnight - timedelta(days=210)).strftime(DATE_FMT)
+    default_start = (midnight - timedelta(days=180)).strftime(DATE_FMT)
     default_end = (midnight - timedelta(days=21)).strftime(DATE_FMT)
 
     payload = request.get_json() or {}
