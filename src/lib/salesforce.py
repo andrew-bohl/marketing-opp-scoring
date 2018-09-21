@@ -50,35 +50,26 @@ class salesforce_api(object):
         salesforce_df['Order_ID__c'] = salesforce_df['Order_ID__c'].combine_first(salesforce_df['Company'])
         self.data = salesforce_df[['Id', 'Order_ID__c', 'Created_Date_Time__c']]
 
-    def write_lead_scores(self, scores, old_scores=None):
-        """ Writes lead scorees to salesforce
+    def write_lead_scores(self, scores):
+        """ Writes lead scores to salesforce
 
         :param scores: Dict of scores where the order_id is the key and value is score
         :return: updates leads in sf
         """
-        for lead in scores:
-            sf_id = lead
-            score = round(scores[lead][1]*100, -1)
-
+        for lead in scores.keys():
             a_num = np.random.choice(100)
             if a_num > 90:
                 time.sleep(3)
 
             try:
-                prev_score = round(old_scores[sf_id][1]*100, -1)
-            except (KeyError, TypeError):
-                prev_score = 0
-
-            if score > prev_score:
-                try:
-                    log.info("SF LEAD:{0} has score {1}".format(lead, score))
-                    self.sf_client.Lead.update(sf_id, {'Comm_score__c': score}, headers={"Sforce-Auto-Assign": "False"})
-                except SalesforceResourceNotFound as e:
-                    log.error(e.content)
-                except SalesforceMalformedRequest as e:
-                    log.error(e.content)
-                except TypeError:
-                    log.error("TypeError for lead: {0} with score {1}".format(lead, score))
+                log.info("SF LEAD:{0} has score {1}".format(lead, scores[lead]))
+                self.sf_client.Lead.update(lead, {'Comm_score__c': scores[lead]}, headers={"Sforce-Auto-Assign": "False"})
+            except SalesforceResourceNotFound as e:
+                log.error(e.content)
+            except SalesforceMalformedRequest as e:
+                log.error(e.content)
+            except TypeError:
+                log.error("TypeError for lead: {0} with score {1}".format(lead, scores[lead]))
 
 
 

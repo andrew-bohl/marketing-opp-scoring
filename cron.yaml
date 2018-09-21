@@ -3,22 +3,10 @@ cron:
   schedule: every 10 minutes
   target: stripe-service-batch
   url: /updatestripe
-- description: "affiliate attribution job"
-  schedule: every day 05:00
-  target: affiliation-attribution-service
-  url: /affiliate-attrib-svc/attribute-conversions
-- description: "pending ir status update"
-  schedule: every 2 hours
-  target: affiliation-attribution-service
-  url: /affiliate-attrib-svc/pending-ir-status-update
-- description: "marketing lead scoring job"
-  schedule: every saturday 05:00
-  target: marketing-lead-scoring
-  url: /lead-scoring/train-model
-- description: "marketing lead scoring job"
-  schedule: every 8 hours
-  target: marketing-lead-scoring
-  url: /lead-scoring/score-leads
+- description: "facebook audience integration"
+  schedule: every day 10:00
+  target: facebook-audience-integration
+  url: /updatefacebook
 - description: "marketing opp scoring job"
   schedule: every 6 hours
   target: marketing-opp-scoring
@@ -27,5 +15,11 @@ cron:
   schedule: every saturday 05:00
   target: marketing-opp-scoring
   url: /opp-scoring/train-model
-
-
+- description: "marketing opp scoring job"
+  schedule: every 8 hours
+  target: marketing-opp-scoring
+  url: /opp-scoring/write-scores
+- description: "salesforce updater job"
+  schedule: every 4 hours
+  target: salesforce-updater-service
+  url: /salesforce-updater/update-sf

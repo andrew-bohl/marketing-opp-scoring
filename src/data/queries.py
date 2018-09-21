@@ -160,13 +160,11 @@ class QueryLogic(object):
     WHERE trial_date >= '{}' and trial_date <= '{}'
     """
 
-    TRIAL_CONV_QUERY = """
-    SELECT 
-        trial_id,
-        trial_date, 
-        sub_id, 
-        sub_date,
-        CASE WHEN sub_id IS NOT NULL THEN 1 else -1 END as converted 
-    FROM `v1-dev-main.LeadScoring.trial_conversions`
-    WHERE trial_date >= '{}' and trial_date <= '{}'
+    NN_SCORES_QUERY = """
+        SELECT lead_id, 
+        label 
+        FROM `v1-dev-main.LeadScoring.vw_scores_to_salesforce` as s
+        INNER JOIN `v1-dev-main.salesforce.vw_leads` as l
+        ON l.id = s.lead_id
+        WHERE DATE_DIFF(CURRENT_DATE,CAST(l.createddate as date), DAY) <= 14
     """

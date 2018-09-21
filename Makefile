@@ -28,7 +28,7 @@ run_local: build
 deploy: build
 	docker tag $(SERVICE) gcr.io/v1-dev-main/$(SERVICE):$(TAG)
 	docker push gcr.io/v1-dev-main/$(SERVICE):$(TAG)
-	gcloud app deploy app.$(ENV).yaml cron.yaml --project=v1-$(ENV)-main --version=$(shell date +%Y%m%d-%H%M) --image-url=gcr.io/v1-dev-main/$(SERVICE):$(TAG) --verbosity=info
+	gcloud app deploy app.$(ENV).yaml cron.yaml --project=v1-$(ENV)-main --version=$(shell date +%Y%m%d-%H%M) --image-url=gcr.io/v1-dev-main/$(SERVICE):$(TAG) --verbosity=debug
 
 logs:
 	gcloud app logs tail \

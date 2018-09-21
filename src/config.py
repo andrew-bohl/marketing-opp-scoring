@@ -14,6 +14,13 @@ class BaseConfig(object):
     APP_NAME = "marketing-opp-scoring"
     ENV = os.getenv('ENV', 'dev')
 
+
+    SALESFORCE_USERNAME = os.getenv("SALESFORCE_USERNAME")
+    SALESFORCE_PASSWORD = os.getenv("SALESFORCE_PASSWORD")
+    SALESFORCE_TOKEN = os.getenv("SALESFORCE_TOKEN")
+    SALESFORCE_DOMAIN = os.getenv("SALESFORCE_DOMAIN")
+
+
     # big query configurations
     BQ_PROJECT_ID = os.getenv("BQ_PROJECT_ID", 'v1-dev-main')
     LEADSCORING_DATASET = os.getenv("LEADSCORING_DATASET", 'LeadScoring')

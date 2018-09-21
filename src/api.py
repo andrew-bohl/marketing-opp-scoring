@@ -78,3 +78,25 @@ def train_model():
     return jsonify(status="Retraining")
 
 
+@api.route('/write-scores', methods=['GET', 'POST'])
+def write_scores():
+    """
+    Gets the scores of leads created in the last 14 days
+    """
+    midnight = datetime.combine(datetime.today(), time.min)
+    default_start = (midnight - timedelta(days=14)).strftime(DATE_FMT)
+    default_end = midnight.strftime(DATE_FMT)
+
+    payload = request.get_json() or {}
+
+    start_date = _format_date(payload, "start_date", default_start)
+    end_date = _format_date(payload, "end_date", default_end)
+    flask_config = current_app.config
+
+    t = threading.Thread(group=None,
+                         target=model.write_scores,
+                         name="writing-scores",
+                         args=(start_date, end_date, flask_config))
+    t.start()
+    return jsonify(status="writing scores to salesforce")
+

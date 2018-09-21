@@ -11,7 +11,9 @@ import logging as log
 import numpy as np
 from google.cloud import storage
 
+from src.data import queries
 from src.lib.models import models, utilities as util
+from src.lib import bigquery as bq, salesforce
 
 
 def train(start_date, end_date, flask_config):
@@ -72,9 +74,6 @@ def infer(start_date, end_date, flask_config):
     year, month, date = int(model_date[:4]), int(model_date[4:6]), int(model_date[6:])
     model_date = dt(year, month, date)
 
-    # except TypeError:
-    #     model_date = dt(1900, 1, 1)
-
     if (dt.today() - model_date) <= timedelta(days=30):
         # use imported model
         current_model.models = logreg_models
@@ -84,15 +83,16 @@ def infer(start_date, end_date, flask_config):
         for model_name in logreg_models.keys():
             features[model_name] = logreg_models[model_name].features_names
 
-        ids_set, datasets, features, lead_lookup = current_model.create_model_data(date_range, features, training=False)
-        ensemble_features, opp_values, trial_ids, feature_sets = current_model.create_ensemble_features(datasets, ids_set)
+        ids_set, datasets, features, sf_leadlookup = current_model.create_model_data(date_range, features, training=False)
+        current_model.split_dataset(ids_set, datasets, test_size=0.0)
+        new_dataset = current_model.train_set
+        ensemble_features, opp_values, trial_ids, feature_sets = current_model.create_ensemble_features(new_dataset, ids_set)
 
         opp_values = np.array([1 if y else 0 for y in opp_values])
         ensemble_features = np.array(ensemble_features)
-        print("ensemble shape \n\n")
-        print(ensemble_features.shape)
         trial_ids = np.array(trial_ids)
-        score_ix = np.where(opp_values == 0)
+        ix_list = np.arange(len(opp_values))
+        score_ix = ix_list[np.where(opp_values != 1)]
 
         ensembler_scores = current_model.ensembler.predict(ensemble_features)
         good, best = util.get_percentile_groups(ensembler_scores)
@@ -102,39 +102,40 @@ def infer(start_date, end_date, flask_config):
             insert_at = dt.now()
             trial_order_detail_id = trial_ids[i]
             try:
-                lead_id = lead_lookup[trial_order_detail_id]
+                lead_id = sf_leadlookup[trial_order_detail_id]
             except KeyError:
                 log.info("No lead_id found for trial: %s" % trial_order_detail_id)
                 lead_id = None
-            ensembler_score = ensembler_scores[i]
-            ga_score = feature_sets['ga'][trial_order_detail_id][0][0][1]
-            ga_yhat = feature_sets['ga'][trial_order_detail_id][1][0]
-            tasks_score = feature_sets['tasks'][trial_order_detail_id][0][0][1]
-            tasks_yhat = feature_sets['tasks'][trial_order_detail_id][1][0]
-            admin_score = feature_sets['admin'][trial_order_detail_id][0][0][1]
-            admin_yhat = feature_sets['admin'][trial_order_detail_id][1][0]
-            sf_leads_score = feature_sets['sf_leads'][trial_order_detail_id][0][0][1]
-            sf_leads_yhat = feature_sets['sf_leads'][trial_order_detail_id][1][0]
-            v2clicks_score = feature_sets['v2clicks'][trial_order_detail_id][0][0][1]
-            v2clicks_yhat = feature_sets['v2clicks'][trial_order_detail_id][1][0]
-            if ensembler_score > good:
-                if ensembler_score < best:
+            NN_score = ensembler_scores[i][0].astype('float64')
+            sf_leads_score = ensemble_features[i][0].astype('float64')
+            sf_leads_yhat = ensemble_features[i][1]
+            admin_score = ensemble_features[i][2].astype('float64')
+            admin_yhat = ensemble_features[i][3]
+            ga_score = ensemble_features[i][4].astype('float64')
+            ga_yhat = ensemble_features[i][5]
+            tasks_score = ensemble_features[i][6].astype('float64')
+            tasks_yhat = ensemble_features[i][7]
+            v2clicks_score = ensemble_features[i][8].astype('float64')
+            v2clicks_yhat = ensemble_features[i][9]
+            if NN_score >= good:
+                if NN_score < best:
                     label = 'better'
                 else:
                     label = 'best'
             else:
                 label = 'good'
-            a_record = (insert_at, lead_id, trial_order_detail_id, ensembler_score,
+
+            a_record = [insert_at, lead_id, trial_order_detail_id, NN_score,
                         ga_score, ga_yhat,
                         tasks_score, tasks_yhat,
                         admin_score, admin_yhat,
                         sf_leads_score, sf_leads_yhat,
                         v2clicks_score, v2clicks_yhat,
-                        label)
-            records.append(a_record)
+                        label]
+            records.append(tuple(a_record))
+            # current_model.write_data([tuple(a_record)])
 
         current_model.write_data(records)
-        util.writeall_gcs_files(gcs, config["BUCKET_NAME"], output_path)
 
     else:
         log.error("Model is older than 30 days. Please train first")
@@ -144,3 +145,14 @@ def infer(start_date, end_date, flask_config):
         end_date = midnight - timedelta(days=30)
         train(start_date, end_date, flask_config)
         infer(start_date, end_date, flask_config)
+
+
+def write_scores(startdate, enddate, flask_config):
+    bq_client = bq.BigQueryClient(flask_config["BQ_PROJECT_ID"], flask_config["LEADSCORING_DATASET"],
+                                  flask_config["OPPSCORING_TABLE"],
+                                  'src/credentials/leadscoring.json')
+    scores_query = queries.QueryLogic.NN_SCORES_QUERY
+    scores_dataframe = util.load_bigquery_data(bq_client, scores_query)
+    scores = scores_dataframe.set_index('lead_id').to_dict()
+    sf_client = salesforce.salesforce_api(flask_config, sandbox=False)
+    sf_client.write_lead_scores(scores['label'])

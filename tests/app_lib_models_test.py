@@ -46,7 +46,6 @@ class ModelTests(unittest.TestCase):
         self.test_features = test_features
         self.test_y = test_y
 
-
     def test_load_data(self):
         """Tests load data function is generating approx size data"""
         sf_data_sz = len(self.salesforce)

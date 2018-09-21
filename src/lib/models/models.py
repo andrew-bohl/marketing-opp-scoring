@@ -174,6 +174,7 @@ class Model(object):
             training_sets[name] = (a_xtrain, a_ytrain, aids_train)
 
             a_xtest, a_ytest, aids_test = assemble_features(datasets[name], test_ids)
+
             testing_sets[name] = (a_xtest, a_ytest, aids_test)
 
         self.test_set = testing_sets
@@ -186,7 +187,6 @@ class Model(object):
 
         models = {}
         for m_name in training_sets.keys():
-            print(m_name)
             lr = LogRegModel()
             lr.create_lr_model(training_sets[m_name][0], training_sets[m_name][1], features_names[m_name])
             models[m_name] = lr
@@ -255,18 +255,18 @@ class Model(object):
         gcp_project_name = self.config["BQ_PROJECT_ID"]
         dataset_name = self.config["LEADSCORING_DATASET"]
         table_name = self.config["OPPSCORING_TABLE"]
-        relative_path = os.path.dirname(__file__)
 
+        relative_path = os.path.dirname(__file__)
         bq_client = bq.BigQueryClient(gcp_project_name, dataset_name, table_name,
                                       relative_path + '/credentials/leadscoring.json')
 
         bq_client.insert_records(records)
 
     def create_ensemble_features(self, dataset, master_ids):
-        """Create ensemble model inputs"""
+        """Create ensemble model inputs
+        :param dataset: is a dictionary of tuples (X_set, Y_set)"""
         feature_sets = {}
         for data_name in self.models.keys():
-            print(data_name)
             data_dict = {}
             for i in range(len(dataset[data_name][0])):
                 x_feat = np.nan_to_num(dataset[data_name][0][i].reshape(1, -1))
