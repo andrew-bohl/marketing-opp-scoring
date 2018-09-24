@@ -10,5 +10,4 @@ RUN apt-get update && \
     pip install pipenv
 
 COPY Pip* ./
-
 RUN pipenv install --three --deploy --system 
