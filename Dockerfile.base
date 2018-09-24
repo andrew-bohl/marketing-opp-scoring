@@ -1,34 +1,14 @@
-FROM gcr.io/v1-dev-main/datascience-base:python3-alpine-tf
+FROM tensorflow/tensorflow:latest-py3
 
-ENV PYTHONPATH=/app
+ENV LC_ALL=C.UTF-8 \
+    LANG=C.UTF-8 \
+    PYTHONPATH=/app
 WORKDIR /app
 
-# Build dependencies
-RUN apk add --no-cache --virtual=.buildeps build-base curl g++ gcc gfortran git linux-headers musl-dev openssh-client 
+RUN apt-get update && \
+    apt-get -y install curl && \
+    pip install pipenv
 
-# App System Dependencies
-RUN echo "http://dl-8.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories && \
-	apk --no-cache --update-cache add \
-    freetype-dev \
-    libffi-dev \
-    libpng-dev \
-    openblas-dev \
-    openssl-dev \
-    python3 \
-    python3-dev \
-    py-pip \
-    wget && \
-	ln -s /usr/include/locale.h /usr/include/xlocale.h && \
+COPY Pip* ./
 
-	apk add --no-cache \
-			--allow-untrusted \
-			--repository \
-		http://dl-3.alpinelinux.org/alpine/edge/testing \
-		hdf5 \
-		hdf5-dev && \
-    apk add --no-cache \
-        build-base
-
-RUN pip3 install --no-cache-dir --no-binary :all: tables h5py  
-RUN pip3 install --no-cache-dir -U numpy scipy pandas pipenv
-
+RUN pipenv install --three --deploy --system 

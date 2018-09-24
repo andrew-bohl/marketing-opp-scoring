@@ -4,28 +4,31 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-raven = {extras = ["flask"]}
 Flask = "*"
 Flask-Script = "*"
-python-nginx = "*"
-requests = "*"
-Twisted = "*"
 google-cloud = "*"
-SQLAlchemy = "*"
-sqlalchemy_bigquery = "*"
-pycodestyle = "*"
-scikit-learn = {extras = ["alldeps"]}
-simple-salesforce = "*"
-nose = "*"
-service-identity = "*"
-pytest = "*"
-pytest-cov = "*"
-mock = "*"
-pandas = "*"
 google-cloud-bigquery = "*"
 google-cloud-storage = "*"
+mock = "*"
+nose = "*"
+pandas = "*"
+pycodestyle = "*"
+pytest = "*"
+pytest-cov = "*"
+python-nginx = "*"
+raven = {extras = ["flask"]}
+requests = "*"
+scikit-learn = {extras = ["alldeps"]}
+scipy = "*"
+service-identity = "*"
+simple-salesforce = "*"
+SQLAlchemy = "*"
+sqlalchemy_bigquery = "*"
+Twisted = "*"
+numpy = "==1.14.5"
+keras = "*"
 
 [dev-packages]
 
 [requires]
-python_version = "3.6"
+python_version = "3.5"

@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import logging
 import os
 import sys
@@ -23,10 +25,10 @@ def create_app(config=None, app_name=None):
         flask application instance
     """
     def dump_config():
-        print(f"Starting {config.APP_NAME} with config:")
+        print("Starting {} with config:".format(config.APP_NAME))
         for k, v in vars(config).items():
             if not k.startswith("__"):
-                print(f"{k}: {v}")
+                print("{}: {}".format(k, v))
         print("\n\n")
 
     dump_config()
@@ -43,7 +45,10 @@ def create_app(config=None, app_name=None):
 def _configure_sentry(app):
     SENTRY_KEY = os.getenv("SENTRY_DSN_KEY")
     SENTRY_PROJECT = os.getenv("SENTRY_PROJECT")
-    app.sentry = Sentry(app, dsn=f"https://{SENTRY_KEY}@sentry.io/{SENTRY_PROJECT}")
+    app.sentry = Sentry(
+        app,
+        dsn="https://{}@sentry.io/{}".format(SENTRY_KEY,SENTRY_PROJECT)
+    )
 
 
 def _configure_app(app, config=None):
