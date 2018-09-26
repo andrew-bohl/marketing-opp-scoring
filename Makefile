@@ -32,7 +32,7 @@ deploy: build
 
 logs:
 	gcloud app logs tail \
-		--service=$(SERVICE) 
+		--service=$(SERVICE) \
 		--version=`gcloud app instances list --project=v1-$(ENV)-main | grep $(SERVICE) | awk '{print $$2}'` \
 		--project=v1-$(ENV)-main \
 		| grep -v '/health-check'
