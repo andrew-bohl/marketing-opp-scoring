@@ -119,9 +119,9 @@ def infer(start_date, end_date, flask_config):
             v2clicks_yhat = ensemble_features[i][9]
             if NN_score >= good:
                 if NN_score < best:
-                    label = 'better'
+                    label = 'best' #we are switching the names as per sales request
                 else:
-                    label = 'best'
+                    label = 'better' #good will actually be best in order to get sales to call more
             else:
                 label = 'good'
 
@@ -156,3 +156,4 @@ def write_scores(startdate, enddate, flask_config):
     scores = scores_dataframe.set_index('lead_id').to_dict()
     sf_client = salesforce.salesforce_api(flask_config, sandbox=False)
     sf_client.write_lead_scores(scores['label'])
+
