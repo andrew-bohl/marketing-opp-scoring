@@ -51,7 +51,7 @@ class salesforce_api(object):
         self.data = salesforce_df[['Id', 'Order_ID__c', 'Created_Date_Time__c']]
 
     def write_lead_scores(self, scores):
-        """ Writes lead scores to salesforce
+        """ Writes lead scorees to salesforce
 
         :param scores: Dict of scores where the order_id is the key and value is score
         :return: updates leads in sf
@@ -63,13 +63,14 @@ class salesforce_api(object):
 
             try:
                 log.info("SF LEAD:{0} has score {1}".format(lead, scores[lead]))
-                self.sf_client.Lead.update(lead, {'Comm_score__c': scores[lead]}, headers={"Sforce-Auto-Assign": "False"})
+                self.sf_client.Lead.update(lead, {'Comm_score2__c': scores[lead]}, headers={"Sforce-Auto-Assign": "False"})
             except SalesforceResourceNotFound as e:
                 log.error(e.content)
             except SalesforceMalformedRequest as e:
                 log.error(e.content)
             except TypeError:
                 log.error("TypeError for lead: {0} with score {1}".format(lead, scores[lead]))
+
 
 
 

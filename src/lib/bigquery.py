@@ -176,3 +176,4 @@ class BigQueryClient(object):
             # if error is due to schema mismatch stop the process
             self._log_raise_exception(error_msg, BadRequestError)
 
+

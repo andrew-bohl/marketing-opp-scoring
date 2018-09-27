@@ -100,3 +100,7 @@ def write_scores():
     t.start()
     return jsonify(status="writing scores to salesforce")
 
+
+@api.route('/', methods=['GET'])
+def check_health():
+    return jsonify(status="OK")

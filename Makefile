@@ -40,3 +40,4 @@ logs:
 		--project=v1-$(ENV)-main \
 		| grep -v '/health-check'
 
+

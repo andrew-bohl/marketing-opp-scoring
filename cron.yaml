@@ -23,4 +23,3 @@ cron:
   schedule: every day 10:30
   target: marketing-opp-scoring
   url: /opp-scoring/write-scores
-

@@ -87,6 +87,7 @@ app = create_app(config=BaseConfig)
 
 @app.route('/health-check', methods=['GET'])
 @app.route('/_ah/health', methods=['GET'])
+@app.route('/', methods=['GET'])
 def health_check():
     """health check for api call
     A GET api call to this address will return a json payload
@@ -101,3 +102,4 @@ def health_check():
 if __name__ == '__main__':
     app = create_app(config=BaseConfig)
     app.run()
+

@@ -38,3 +38,4 @@ class BaseConfig(object):
     OUTPUTS_PATH = 'outputs/'
     """ TEST CONFIG E.G CUT OFF DATES FOR TESTING """
     TEST_CUTOFF = dt.datetime(2018, 2, 1)
+

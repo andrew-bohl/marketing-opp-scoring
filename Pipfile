@@ -15,6 +15,7 @@ pandas = "*"
 pycodestyle = "*"
 pytest = "*"
 pytest-cov = "*"
+<<<<<<< Updated upstream
 python-nginx = "*"
 raven = {extras = ["flask"]}
 requests = "*"
@@ -27,8 +28,18 @@ sqlalchemy_bigquery = "*"
 Twisted = "*"
 numpy = "==1.14.5"
 keras = "*"
+=======
+mock = "*"
+pandas = "*"
+google-cloud-bigquery = "*"
+google-cloud-storage = "*"
+tensorflow = "==1.7.0"
+keras = "*"
+"h5py" = "*"
+>>>>>>> Stashed changes
 
 [dev-packages]
 
 [requires]
 python_version = "3.5"
+
