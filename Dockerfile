@@ -9,5 +9,5 @@ COPY conf /app/conf
 COPY start.sh .
 
 EXPOSE 8080
-RUN ["chmod", "a+rX", "/app/start.sh"]
+RUN ["chmod", "+x", "/app/start.sh"]
 CMD ["/app/start.sh"]

@@ -20,8 +20,6 @@ readiness_check:
   success_threshold: 2
 
 # TODO: Increase capacity once tested.
-manual_scaling:
-  instances: 1
 resources:
   cpu: 4
   memory_gb: 20

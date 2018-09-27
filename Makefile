@@ -1,21 +1,20 @@
-SERVICE := marketing_opp_scoring
+SERVICE := marketing-opp-scoring
 BASE_IMAGE := gcr.io/v1-dev-main/datascience-base-tf2
 TAG := $(shell date +%Y%m%d-%H%M)
-INCLUDE_DIRS := $(PYTHON_INCLUDE) /usr/local/include /usr/include/hdf5/serial/
-LIBRARY_DIRS := $(PYTHON_LIB) /usr/local/lib /usr/lib /usr/lib/x86_64-linux-gnu/hdf5/serial/
-
+ACCOUNT :=$(shell gcloud config list account --format "value(core.account)")
 
 ifeq ($(ENV),)
 $(error ENV needs to be defined. e.g.: make deploy ENV=dev)
 endif
 
-build:
-	gcloud auth configure-docker --account=$$(gcloud auth list | sed -n 's/^\*?[[:space:]]+\(.*volusion.com\).*$$/\1/p')
+auth:
+	gcloud auth configure-docker --account=$(ACCOUNT)
+
+build: auth
 	docker pull $(BASE_IMAGE)
 	docker build -t $(SERVICE) . 
 
-build-base:
-	gcloud auth configure-docker --account=$$(gcloud auth list | sed -n 's/^\*?[[:space:]]+\(.*volusion.com\).*$$/\1/p')
+build-base: auth
 	docker build -t $(BASE_IMAGE) -f Dockerfile.base .
 	docker push $(BASE_IMAGE)
 
@@ -28,7 +27,11 @@ run_local: build
 deploy: build
 	docker tag $(SERVICE) gcr.io/v1-dev-main/$(SERVICE):$(TAG)
 	docker push gcr.io/v1-dev-main/$(SERVICE):$(TAG)
-	gcloud app deploy app.$(ENV).yaml cron.yaml --project=v1-$(ENV)-main --version=$(shell date +%Y%m%d-%H%M) --image-url=gcr.io/v1-dev-main/$(SERVICE):$(TAG) --verbosity=debug
+	gcloud app deploy app.$(ENV).yaml cron.yaml \
+		--project=v1-$(ENV)-main \
+		--version=$(TAG) \
+		--image-url=gcr.io/v1-dev-main/$(SERVICE):$(TAG) \
+		--verbosity=debug
 
 logs:
 	gcloud app logs tail \

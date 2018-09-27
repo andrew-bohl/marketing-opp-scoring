@@ -1,6 +1,7 @@
 runtime: custom
 env: flex
 service: marketing-opp-scoring
+# entrypoint: /app/start.sh
 
 env_variables:
   ENV: dev
@@ -20,6 +21,6 @@ readiness_check:
   success_threshold: 2
 
 resources:
-  cpu: 4
-  memory_gb: 40
-  disk_size_gb: 40
+  cpu: 2
+  memory_gb: 8
+  disk_size_gb: 10
