@@ -11,5 +11,4 @@ RUN apt-get update && \
 
 COPY Pip* ./
 
-RUN pipenv install --three --deploy --system 
-s
+RUN pipenv install --three --deploy --system
