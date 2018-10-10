@@ -155,5 +155,5 @@ def write_scores(startdate, enddate, flask_config):
     scores_dataframe = util.load_bigquery_data(bq_client, scores_query)
     scores = scores_dataframe.set_index('lead_id').to_dict()
     sf_client = salesforce.salesforce_api(flask_config, sandbox=False)
-    sf_client.write_lead_scores(scores['label'])
+    sf_client.write_lead_scores(scores)
 

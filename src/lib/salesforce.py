@@ -56,14 +56,17 @@ class salesforce_api(object):
         :param scores: Dict of scores where the order_id is the key and value is score
         :return: updates leads in sf
         """
-        for lead in scores.keys():
+        for lead in scores['label'].keys():
             a_num = np.random.choice(100)
             if a_num > 90:
                 time.sleep(3)
-
             try:
-                log.info("SF LEAD:{0} has score {1}".format(lead, scores[lead]))
-                self.sf_client.Lead.update(lead, {'Comm_score2__c': scores[lead]}, headers={"Sforce-Auto-Assign": "False"})
+                log.info("SF LEAD:{0} has score {1}".format(lead, scores['label'][lead]))
+                self.sf_client.Lead.update(lead, {'Comm_score2__c': scores['label'][lead]}, headers={"Sforce-Auto-Assign": "False"})
+                if (scores['status'][lead] == 'Qualified') and (scores['ConvertedOpportunityId'][lead] is not None):
+                    oppid = scores['ConvertedOpportunityId'][lead]
+                    self.sf_client.Opportunity.update(oppid, {'Comm_Score__c': scores['label'][lead]}, headers={"Sforce-Auto-Assign": "False"})
+
             except SalesforceResourceNotFound as e:
                 log.error(e.content)
             except SalesforceMalformedRequest as e:

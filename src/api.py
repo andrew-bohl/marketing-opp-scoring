@@ -30,7 +30,7 @@ def score_leads():
     called via a POST request with valid start_date and end_dates, we'll use
     those dates instead.
     """
-    midnight = datetime.combine(datetime.today(), time.min)
+    midnight = datetime.combine(datetime.today(), time.min) + timedelta(days=1)
     default_start = (midnight - timedelta(days=14)).strftime(DATE_FMT)
     default_end = midnight.strftime(DATE_FMT)
 

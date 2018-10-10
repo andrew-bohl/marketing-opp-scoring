@@ -162,7 +162,9 @@ class QueryLogic(object):
 
     NN_SCORES_QUERY = """
         SELECT lead_id, 
-        label 
+        label,
+        ConvertedOpportunityId,
+        status
         FROM `v1-dev-main.LeadScoring.vw_scores_to_salesforce` as s
         INNER JOIN `v1-dev-main.salesforce.vw_leads` as l
         ON l.id = s.lead_id
